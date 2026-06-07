@@ -481,6 +481,23 @@ async function startGame(){
   showStageIntro(0);
 }
 
+// ── 배열 섞기 (Fisher-Yates) ──
+function shuffle(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+// ── 게임 시작 시 2~5단계 문제 순서 한 번만 셔플 ──
+function shuffleAllStages(){
+  for(let i=1;i<STAGES.length;i++){
+    STAGES[i].questions=shuffle(STAGES[i].questions);
+  }
+}
+
 // ── STAGE INTRO ──
 function showStageIntro(si){
   currentStage=si; currentQ=0;
