@@ -163,9 +163,10 @@
     <div class="game-session-badge" id="session-badge">게임 불러오는 중...</div>
     <div class="new-game-confirm" id="new-game-confirm">
       ⚠️ <strong>새 게임을 시작하면 현재 순위 기록이 모두 삭제됩니다.</strong><br>
-      정말 새 게임을 시작할까요?
+      관리자 비밀번호를 입력하세요.
+      <input type="password" id="admin-pw-input" class="name-input" placeholder="비밀번호 입력" style="margin-top:10px;margin-bottom:8px;">
       <div class="confirm-btns">
-        <button class="btn-confirm-yes" onclick="confirmNewGame()">✅ 네, 새로 시작</button>
+        <button class="btn-confirm-yes" onclick="confirmNewGame()">✅ 새로 시작</button>
         <button class="btn-confirm-no" onclick="cancelNewGame()">❌ 취소</button>
       </div>
     </div>
@@ -434,13 +435,24 @@ async function saveGlobalMeta(){
 }
 
 // ── 새 게임 ──
+const ADMIN_PASSWORD = 'welcome';
+
 function showNewGameConfirm(){
   document.getElementById('new-game-confirm').classList.add('show');
+  document.getElementById('admin-pw-input').value='';
+  document.getElementById('admin-pw-input').focus();
 }
 function cancelNewGame(){
   document.getElementById('new-game-confirm').classList.remove('show');
 }
 async function confirmNewGame(){
+  const pw = document.getElementById('admin-pw-input').value;
+  if(pw !== ADMIN_PASSWORD){
+    alert('❌ 비밀번호가 올바르지 않습니다.');
+    document.getElementById('admin-pw-input').value='';
+    document.getElementById('admin-pw-input').focus();
+    return;
+  }
   sessionNum++;
   totalParticipants = 0;
   leaderboard = [];
