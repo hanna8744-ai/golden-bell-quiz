@@ -173,7 +173,7 @@
     <div class="info-grid">
       <div class="info-card"><div class="num">50</div><div class="label">총 문제</div></div>
       <div class="info-card"><div class="num">5</div><div class="label">단계</div></div>
-      <div class="info-card"><div class="num">20s</div><div class="label">문제당 제한시간</div></div>
+      <div class="info-card"><div class="num">40s</div><div class="label">문제당 제한시간</div></div>
       <div class="info-card"><div class="num">500</div><div class="label">만점</div></div>
     </div>
     <div class="rule-box">
@@ -312,7 +312,7 @@ const db = getDatabase(app);
 
 // ── 퀴즈 데이터 ──
 const STAGES=[
-  {id:1,title:'OX 퀴즈',desc:'맞으면 O, 틀리면 X를 선택하세요!',type:'ox',timeLimit:20,pointsPer:10,questions:[
+  {id:1,title:'OX 퀴즈',desc:'맞으면 O, 틀리면 X를 선택하세요!',type:'ox',timeLimit:40,pointsPer:10,questions:[
     {q:'저축은 처분 가능 소득에서 소비 지출을 제외하고 남은 금액이다.',answer:'O',exp:'저축은 미래 소비를 위해 현재 소비를 억제하는 것으로, 처분 가능 소득에서 소비 지출을 제외한 나머지 금액입니다.',page:'📖 교재③ p.55'},
     {q:'일반적으로 금융 소득에 대해서는 세금이 부과되지 않는 것이 원칙이다.',answer:'X',exp:'일반적으로 금융 소득에도 세금(이자소득세 등)이 부과됩니다. 비과세 예금이나 세금 우대 저축은 예외적으로 세제 혜택이 주어지는 상품입니다.',page:'📖 교재③ p.56'},
     {q:'예금자 보호 제도에 따라 금융회사가 파산하더라도 한 금융회사에서 1인당 원금과 이자를 포함해 1억 원까지 보장받을 수 있다.',answer:'O',exp:'2025년 9월 1일부터 예금자보호법 개정으로 보호 한도가 기존 5천만 원에서 1억 원(원금+이자 합산)으로 상향되었습니다.',page:'📖 교재③ p.58'},
