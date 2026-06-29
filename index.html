@@ -52,6 +52,8 @@
   .q-num-tag{background:#f0f4ff;color:var(--blue);font-weight:700;font-size:0.73rem;padding:3px 11px;border-radius:20px;}
   .survival-tag{background:#fff0f0;color:var(--red);font-weight:800;font-size:0.73rem;padding:3px 11px;border-radius:20px;}
   .q-score{font-weight:800;color:var(--navy);font-size:0.86rem;white-space:nowrap;}
+  .survivor-info{background:#f0f4ff;border-radius:10px;padding:7px 12px;margin-bottom:10px;font-size:0.78rem;color:var(--blue);font-weight:700;text-align:center;}
+  .survivor-info .elim-num{color:var(--red);}
   .progress-bar{height:6px;background:#e2e8f0;border-radius:3px;margin-bottom:12px;overflow:hidden;}
   .progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--dark-gold));border-radius:3px;transition:width 0.4s;}
   .timer-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
@@ -214,6 +216,7 @@
       </div>
       <div class="q-score">⭐ <span id="score-display">0</span>점</div>
     </div>
+    <div class="survivor-info" id="survivor-info">생존 현황 불러오는 중...</div>
     <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
     <div class="timer-bar">
       <div class="timer-track"><div class="timer-fill" id="timer-fill"></div></div>
@@ -324,7 +327,7 @@ const STAGES=[
     {q:'정부기관이나 금융회사는 전화나 문자로 개인정보(주민등록번호, 카드 비밀번호)를 요구하거나 돈을 보내라고 할 수 있다.',answer:'X',exp:'정부기관 및 제도권 금융회사는 절대로 전화나 문자로 개인정보를 묻거나 돈을 보내라고 요구하지 않습니다. 이런 연락은 100% 보이스피싱입니다.',page:'📖 교재⑤ p.29'},
     {q:'포트폴리오를 구성하여 분산 투자를 하면 모든 종류의 투자 위험을 완전히 없앨 수 있다.',answer:'X',exp:'분산 투자는 개별 기업의 위험은 줄일 수 있지만, 경기 변동·인플레이션 등 시장 전체의 위험(시스템 위험)까지 모두 제거할 수는 없습니다.',page:'📖 교재③ p.73'},
   ]},
-  {id:2,title:'2단계 – 저축과 투자',desc:'저축 상품, 예금자 보호, 투자 원칙에 관한 문제입니다.',type:'mc',timeLimit:20,pointsPer:10,questions:[
+  {id:2,title:'2단계 – 저축과 투자',desc:'저축 상품, 예금자 보호, 투자 원칙에 관한 문제입니다.',type:'mc',timeLimit:40,pointsPer:10,questions:[
     {q:'저축 상품을 선택할 때, 시중 금리가 내리는 추세라면 어떤 선택이 유리한가?',opts:['1년짜리 단기 정기 예금에 자주 갈아탄다','높은 이자율의 장기 정기 예금에 가입한다','수시 입출금이 가능한 보통 예금에 넣어둔다','금리와 관계없이 적금이 항상 유리하다'],answer:1,exp:'시중 금리가 내리는 추세라면 현재의 높은 이자율로 장기 정기 예금을 가입하는 것이 유리합니다.',page:'📖 교재③ p.55'},
     {q:'예금자 보호 제도에서 보호받을 수 있는 한도로 옳은 것은?',opts:['한 금융회사에서 1인당 3천만 원','한 금융회사에서 1인당 5천만 원','한 금융회사에서 1인당 1억 원','금융회사 전체를 합산하여 1인당 1억 원'],answer:2,exp:'2025년 9월 1일부터 예금자보호법 개정으로 보호 한도가 기존 5천만 원에서 1억 원으로 상향되었습니다. 같은 금융회사 내 1인 기준으로 원금과 이자를 합산한 금액입니다.',page:'📖 교재③ p.58'},
     {q:'투자 정보의 신뢰성을 파악할 때 검토해야 할 사항이 아닌 것은?',opts:['누가 만든 정보인가','언제 만들어진 정보인가','어떤 목적으로 만들어진 정보인가','정보를 전달한 사람이 나의 지인인가'],answer:3,exp:'투자 정보의 신뢰성은 ①제작 주체, ②최신성, ③목적으로 판단합니다. 지인을 통한 정보는 신뢰성의 근거가 되지 않습니다.',page:'📖 교재③ p.62'},
@@ -336,7 +339,7 @@ const STAGES=[
     {q:'정기 예금과 정기 적금의 차이로 옳은 것은?',opts:['정기 예금은 목돈 마련, 정기 적금은 목돈 운용을 목적으로 한다','정기 예금은 목돈을 맡겨 운용하고, 정기 적금은 매달 납입하여 목돈을 마련하는 상품이다','정기 예금은 원금 손실이 가능하고, 정기 적금은 원금이 보장된다','정기 예금과 정기 적금은 이자 계산 방식이 동일하다'],answer:1,exp:'정기 예금은 목돈을 일정 기간 맡겨 이자를 받는 목돈 운용 상품이고, 정기 적금은 매달 일정 금액을 납입하여 만기에 목돈을 마련하는 상품입니다.',page:'📖 교재③ p.67'},
     {q:'투자 손실이 발생했을 때, 금융투자 회사의 불완전 판매로 인한 피해를 사후적으로 구제받는 방법이 아닌 것은?',opts:['당사자 간의 합의','금융감독원을 통한 분쟁 조정','법원을 통한 소송','금융투자업자에게 투자 책임 전가 요청'],answer:3,exp:'최종 투자 결정의 책임은 투자자 본인에게 있으므로 단순히 투자 책임을 금융투자업자에게 전가할 수는 없습니다.',page:'📖 교재③ p.75'},
   ]},
-  {id:3,title:'3단계 – 신용과 부채 관리',desc:'신용 거래, 신용 점수, 부채 상환에 관한 문제입니다.',type:'mc',timeLimit:20,pointsPer:10,questions:[
+  {id:3,title:'3단계 – 신용과 부채 관리',desc:'신용 거래, 신용 점수, 부채 상환에 관한 문제입니다.',type:'mc',timeLimit:40,pointsPer:10,questions:[
     {q:"금융 거래에서 '신용'의 의미로 가장 적절한 것은?",opts:['현재 보유한 현금의 총액','금융회사에 예치한 예금의 총액','장래의 어느 시점에 갚을 것을 약속하고 돈을 빌릴 수 있는 능력','신용카드 사용 한도 금액'],answer:2,exp:'금융 거래에서 신용이란 장래의 어느 시점에 갚을 것을 약속하고 돈을 빌릴 수 있는 능력을 뜻합니다.',page:'📖 교재④ p.81'},
     {q:'신용카드 이용에 따른 신용 비용에 해당하지 않는 것은?',opts:['연회비','할부 수수료','단기 카드 대출(현금 서비스) 수수료','신용카드 포인트 적립금'],answer:3,exp:'신용카드 이용에 따른 신용 비용으로는 연회비, 할부 수수료, 단기 카드 대출 수수료, 장기 카드 대출(카드론) 이자 등이 있습니다. 포인트 적립금은 혜택입니다.',page:'📖 교재④ p.85'},
     {q:'신용 점수 관리 방법으로 옳지 않은 것은?',opts:['대출금을 연체하지 않고 성실히 갚는다','휴대폰 요금 등 공과금을 연체하지 않는다','신용 점수를 높이려면 대출을 최대한 많이 받아야 한다','주거래 은행을 꾸준히 이용한다'],answer:2,exp:'과도한 대출은 오히려 신용 점수를 낮출 수 있습니다. 적절한 규모의 대출을 받아 성실히 상환하는 것이 중요합니다.',page:'📖 교재④ p.89'},
@@ -348,7 +351,7 @@ const STAGES=[
     {q:'신용 점수 산정 기준으로 가장 기본적인 평가 요소는?',opts:['직업과 소득 수준','보유 자산 규모','돈을 갚을 의사와 돈을 갚을 능력','거주 지역과 학력'],answer:2,exp:"신용 점수는 기본적으로 '돈을 갚을 의사가 있는지'와 '빌린 돈을 갚을 능력이 있는지'를 중점 평가합니다.",page:'📖 교재④ p.89'},
     {q:'프리 워크아웃(연체 전 채무 조정)에 대한 설명으로 옳은 것은?',opts:['연체가 3개월 이상인 장기 채무자를 대상으로 한다','1~3개월 미만의 단기 연체 중인 개인 채무자를 대상으로 하는 채무 조정 제도이다','법원에서 운영하는 공적 채무 조정 제도이다','원금을 전액 탕감해주는 제도이다'],answer:1,exp:'프리 워크아웃은 신용회복위원회에서 운영하는 사적 채무 조정 제도로, 1~3개월 미만의 단기 연체 중인 개인 채무자를 대상으로 합니다.',page:'📖 교재④ p.97'},
   ]},
-  {id:4,title:'4단계 – 보이스피싱 유형과 사례',desc:'보이스피싱의 다양한 수법과 파생 범죄에 관한 문제입니다.',type:'mc',timeLimit:20,pointsPer:10,questions:[
+  {id:4,title:'4단계 – 보이스피싱 유형과 사례',desc:'보이스피싱의 다양한 수법과 파생 범죄에 관한 문제입니다.',type:'mc',timeLimit:40,pointsPer:10,questions:[
     {q:'보이스피싱의 어원으로 올바르게 연결된 것은?',opts:['음성(voice) + 개인정보(private data) + 낚시(fishing)','영상(video) + 개인정보(private data) + 사기(fraud)','음성(voice) + 피해(pain) + 사기(scam)','전화(phone) + 개인정보(private data) + 낚시(fishing)'],answer:0,exp:'보이스피싱은 음성(voice) + 개인정보(private data) + 낚시(fishing)의 합성어로, 전화를 통해 개인정보·금융 정보를 빼내거나 재산을 편취하는 범죄입니다.',page:'📖 교재⑤ p.4'},
     {q:'보이스피싱 사기 과정의 순서로 옳은 것은?',opts:['무작위 전화 → 사기계좌 확보 → 피해자 기망 → 해외 송금','사기 계좌 확보 → 무작위 전화·문자 → 공공기관 사칭·기망 → 이체 유도 → 해외 송금','공공기관 사칭 → 계좌 확보 → 무작위 전화 → 이체 유도','피해자 기망 → 계좌 확보 → 해외 송금 → 무작위 전화'],answer:1,exp:'보이스피싱 과정은 ①대포통장 확보 → ②무작위 전화·문자 → ③공공기관 사칭·기망 → ④이체 유도 → ⑤해외 송금 순서로 이루어집니다.',page:'📖 교재⑤ p.5'},
     {q:"보이스피싱의 '셀프감금' 수법에 대한 설명으로 옳은 것은?",opts:['피해자의 SNS 계정을 해킹하여 지인에게 돈을 요구하는 수법','피해자의 집에 직접 찾아가 현금을 수거하는 수법','검찰·경찰 등을 사칭하여 범죄 연루를 명목으로 피해자를 숙박업소 등에 고립시킨 뒤 거액을 갈취하는 수법','피해자의 휴대폰을 빼앗아 금융 앱에 직접 접속하는 수법'],answer:2,exp:'셀프감금 수법은 검찰·경찰 등을 사칭하여 피해자를 숙박업소 등에 투숙하게 하여 고립시킨 뒤, 금융 자산은 물론 대출까지 종용하여 거액을 뜯어내는 신종 수법입니다.',page:'📖 교재⑤ p.13~15'},
@@ -360,7 +363,7 @@ const STAGES=[
     {q:'보이스피싱 대출빙자형의 핵심 특징으로 옳은 것은?',opts:['납치·사고를 가장하여 급하게 돈을 요구한다','수사기관을 사칭하여 범죄 연루를 주장한다','저금리 대출·정부 지원 대출을 미끼로 접근하여 선입금을 요구한다','출처 불명의 링크를 클릭하게 하여 악성 앱을 설치시킨다'],answer:2,exp:'대출빙자형은 저금리 대출·정부 지원 대출 등을 미끼로 급전이 필요한 사람을 유인하고, 다양한 명목으로 선입금을 요구하는 것이 핵심 특징입니다.',page:'📖 교재⑤ p.18'},
     {q:'통장묶기(통장 협박)에 대한 설명으로 옳은 것은?',opts:['피해자의 통장 비밀번호를 알아내어 직접 인출하는 수법','보이스피싱 피해자를 보호하기 위한 계좌 지급정지 제도를 악용하여, 피해자의 계좌를 지급정지 시킨 뒤 해제해준다며 돈을 갈취하는 수법','피해자를 협박하여 새 통장을 개설하게 만드는 수법','피해자 명의로 대포통장을 만들어 범죄에 이용하는 수법'],answer:1,exp:'통장묶기는 계좌 지급정지 제도를 악용하여, 피해자의 계좌에 소액을 입금한 뒤 허위 신고로 지급정지 시키고, 지급정지를 풀어주겠다며 돈을 요구하는 수법입니다.',page:'📖 교재⑤ p.25, 27'},
   ]},
-  {id:5,title:'5단계 – 종합 심화',desc:'금융 종합 심화 문제입니다. 집중하세요!',type:'mc',timeLimit:20,pointsPer:10,questions:[
+  {id:5,title:'5단계 – 종합 심화',desc:'금융 종합 심화 문제입니다. 집중하세요!',type:'mc',timeLimit:40,pointsPer:10,questions:[
     {q:'보이스피싱 피해 발생 시 신고 기관과 전화번호가 잘못 연결된 것은?',opts:['경찰청(지급정지 신고) — ☎ 112','금융감독원(피해상담 및 환급) — ☎ 1332','한국인터넷진흥원(해킹·피싱·스미싱 신고) — ☎ 118','전기통신금융사기 통합신고대응센터 — ☎ 112'],answer:3,exp:'전기통신금융사기 통합신고대응센터의 번호는 ☎1566-1188입니다. ☎112는 경찰청(보이스피싱 지급정지 신고)의 번호입니다.',page:'📖 교재⑤ p.32'},
     {q:'개인정보가 유출되었을 때 신규 계좌 개설 및 신용카드 발급 등을 제한하기 위해 등록하는 시스템은?',opts:['계좌통합관리서비스(payinfo.or.kr)','명의도용방지서비스(msafer.or.kr)','금융감독원 개인정보노출자 사고예방시스템(pd.fss.or.kr)','금융소비자 포털 파인(fine.fss.or.kr)'],answer:2,exp:'개인정보가 노출된 경우 금융감독원 개인정보노출자 사고예방시스템(pd.fss.or.kr)에 등록하면, 금융회사들이 해당 정보를 공유하여 신규 계좌 개설 및 카드 발급 등을 제한합니다.',page:'📖 교재⑤ p.34'},
     {q:"보이스피싱 예방을 위한 '여신거래 안심차단' 서비스의 기능으로 옳은 것은?",opts:['내가 지정한 기기에서만 인터넷뱅킹 이체를 허용하는 서비스','이체 시 일정 시간 경과 후 입금되어 취소 기회를 주는 서비스','신용대출, 카드론, 신용카드 발급 등 모든 신규 대출을 사전에 차단하는 서비스','본인 명의로 개통된 휴대폰을 조회하고 차단하는 서비스'],answer:2,exp:'여신거래 안심차단 서비스는 신용대출, 카드론, 신용카드 발급 등 모든 신규 대출을 사전에 차단하여 본인도 모르는 사이 실행된 대출 피해를 예방하는 서비스입니다.',page:'📖 교재⑤ p.29~30'},
@@ -373,6 +376,9 @@ const STAGES=[
     {q:'다음 중 신용 점수에 긍정적인 영향을 미치는 행동으로 옳은 것은?',opts:['대부업체에서 여러 건의 소액 대출을 받는다','신용카드 대금을 한 달씩 미뤄서 낸다','휴대폰 요금을 매달 연체한다','주거래 은행을 꾸준히 이용하고 통신 요금 등 공과금을 성실히 납부한다'],answer:3,exp:'신용 점수 관리를 위해서는 주거래 은행을 꾸준히 이용하고, 휴대폰 요금을 비롯한 각종 공과금을 연체하지 않도록 성실히 납부해야 합니다.',page:'📖 교재④ p.89'},
   ]}
 ];
+
+// ── 원본 문제 순서 보존 (셀 복원용) ──
+const ORIGINAL_STAGES = JSON.parse(JSON.stringify(STAGES));
 
 // ── STATE ──
 let playerName='', currentStage=0, currentQ=0, score=0;
@@ -387,6 +393,7 @@ let totalParticipants=0;
 const dbRef = () => ref(db, `sessions/session_${sessionNum}`);
 const metaRef = () => ref(db, `sessions/session_${sessionNum}/meta`);
 const lbRef = () => ref(db, `sessions/session_${sessionNum}/leaderboard`);
+const orderRef = () => ref(db, `sessions/session_${sessionNum}/questionOrder`);
 const globalMetaRef = ref(db, 'global_meta');
 
 // ── Firebase 초기화 ──
@@ -456,6 +463,11 @@ async function confirmNewGame(){
   sessionNum++;
   totalParticipants = 0;
   leaderboard = [];
+  // 원본 문제 순서로 복원 (새 회차에서 새로 섞이도록)
+  applyShuffleOrders(null);
+  for(let i=1;i<STAGES.length;i++){
+    STAGES[i].questions = JSON.parse(JSON.stringify(ORIGINAL_STAGES[i].questions));
+  }
   await saveGlobalMeta();
   document.getElementById('new-game-confirm').classList.remove('show');
   updateSessionBadge();
@@ -503,10 +515,25 @@ function shuffle(arr){
   return a;
 }
 
-// ── 게임 시작 시 2~5단계 문제 순서 한 번만 셔플 ──
-function shuffleAllStages(){
+// ── 셀 순서(인덱스 배열) 생성 ──
+function generateShuffleOrders(){
+  const orders={};
   for(let i=1;i<STAGES.length;i++){
-    STAGES[i].questions=shuffle(STAGES[i].questions);
+    const idxArr=STAGES[i].questions.map((_,idx)=>idx);
+    orders[i]=shuffle(idxArr);
+  }
+  return orders;
+}
+
+// ── 저장된 순서대로 STAGES.questions 재배열 ──
+function applyShuffleOrders(orders){
+  if(!orders) return;
+  for(let i=1;i<STAGES.length;i++){
+    const order=orders[i];
+    if(order && order.length===STAGES[i].questions.length){
+      const original=ORIGINAL_STAGES[i].questions;
+      STAGES[i].questions = order.map(idx=>original[idx]);
+    }
   }
 }
 
@@ -524,7 +551,7 @@ function showStageIntro(si){
 function startStage(){ showScreen('quiz-screen'); showQuestion(); }
 
 // ── QUIZ ──
-function showQuestion(){
+async function showQuestion(){
   clearTmr(); answered=false;
   const s=STAGES[currentStage], q=s.questions[currentQ];
   const total=50, done=STAGES.slice(0,currentStage).reduce((a,x)=>a+x.questions.length,0)+currentQ;
@@ -533,6 +560,7 @@ function showQuestion(){
   document.getElementById('score-display').textContent=score;
   document.getElementById('progress-fill').style.width=`${(done/total)*100}%`;
   document.getElementById('question-text').textContent=q.q;
+  await updateSurvivorInfo();
   const fb=document.getElementById('feedback-box');
   fb.className='feedback-box'; fb.innerHTML='';
   const nb=document.getElementById('btn-next-q');
@@ -575,6 +603,25 @@ function updateTimerUI(rem,total){
   tt.textContent=rem; tt.style.color=rem>5?'#222':'#dc2626';
 }
 function clearTmr(){ if(tmr){clearInterval(tmr);tmr=null;} }
+
+// ── 생존자/탈락자 현황 실시간 조회 ──
+async function updateSurvivorInfo(){
+  try{
+    const snap = await get(lbRef());
+    let elimCount = 0;
+    if(snap.exists()){
+      const data = Object.values(snap.val()).filter(v=>v && v.name);
+      elimCount = data.filter(e=>e.survived===0).length;
+    }
+    const el = document.getElementById('survivor-info');
+    if(el){
+      el.innerHTML = `👥 전체 참여자 <strong>${totalParticipants}</strong>명 중 💀 탈락 <strong class="elim-num">${elimCount}</strong>명`;
+    }
+  }catch(e){
+    const el = document.getElementById('survivor-info');
+    if(el) el.textContent = '생존 현황을 불러올 수 없습니다';
+  }
+}
 
 function selectAnswer(val,btn){
   if(answered)return;
