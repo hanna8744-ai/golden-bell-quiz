@@ -26,9 +26,14 @@
   .btn-start{width:100%;padding:14px;background:linear-gradient(135deg,var(--gold),var(--dark-gold));border:none;border-radius:14px;font-size:1.05rem;font-weight:800;color:var(--navy);cursor:pointer;letter-spacing:1px;transition:transform 0.15s;}
   .btn-start:hover{transform:translateY(-2px);}
   .btn-start:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
-  .new-game-wrap{position:relative;width:100%;}
-  .btn-new-game{position:absolute;top:-10px;right:0;background:#e53e3e;color:white;border:none;border-radius:10px;padding:7px 14px;font-size:0.78rem;font-weight:800;cursor:pointer;transition:background 0.2s;}
+  .new-game-wrap{position:relative;width:100%;display:flex;justify-content:flex-end;gap:8px;margin-bottom:6px;}
+  .btn-new-game{background:#e53e3e;color:white;border:none;border-radius:10px;padding:7px 14px;font-size:0.78rem;font-weight:800;cursor:pointer;transition:background 0.2s;}
   .btn-new-game:hover{background:#c53030;}
+  .btn-admin{background:#334155;color:white;border:none;border-radius:10px;padding:7px 14px;font-size:0.78rem;font-weight:800;cursor:pointer;transition:background 0.2s;}
+  .btn-admin:hover{background:#1e293b;}
+  .admin-summary-card{background:#f0f4ff;border-radius:12px;padding:10px;text-align:center;}
+  .admin-summary-card .num{font-size:1.25rem;font-weight:900;color:var(--blue);}
+  .admin-summary-card .label{font-size:0.68rem;color:var(--gray);}
   .new-game-confirm{display:none;background:#fff5f5;border:2px solid var(--red);border-radius:12px;padding:12px 16px;margin-bottom:14px;text-align:center;font-size:0.83rem;color:#742a2a;line-height:1.6;}
   .new-game-confirm.show{display:block;}
   .confirm-btns{display:flex;gap:8px;margin-top:10px;}
@@ -164,6 +169,7 @@
 <div id="title-screen" class="screen active">
   <div class="title-box">
     <div class="new-game-wrap">
+      <button class="btn-admin" onclick="showAdminLogin()">🛠 관리자</button>
       <button class="btn-new-game" onclick="showNewGameConfirm()">🔄 새 게임</button>
     </div>
     <span class="bell-icon">🔔</span>
@@ -177,6 +183,14 @@
       <div class="confirm-btns">
         <button class="btn-confirm-yes" onclick="confirmNewGame()">✅ 새로 시작</button>
         <button class="btn-confirm-no" onclick="cancelNewGame()">❌ 취소</button>
+      </div>
+    </div>
+    <div class="new-game-confirm" id="admin-login-confirm">
+      🛠 <strong>관리자 페이지에 들어가려면 비밀번호를 입력하세요.</strong>
+      <input type="password" id="admin-login-pw-input" class="name-input" placeholder="비밀번호 입력" style="margin-top:10px;margin-bottom:8px;">
+      <div class="confirm-btns">
+        <button class="btn-confirm-yes" onclick="confirmAdminLogin()">✅ 입장</button>
+        <button class="btn-confirm-no" onclick="cancelAdminLogin()">❌ 취소</button>
       </div>
     </div>
     <div class="info-grid">
@@ -318,6 +332,40 @@
     <button class="btn-lb-back" id="btn-lb-back" onclick="goBackFromLB()">← 돌아가기</button>
   </div>
 </div>
+
+<!-- ADMIN -->
+<div id="admin-screen" class="screen">
+  <div class="lb-card" style="max-width:640px;">
+    <h2>🛠 관리자 페이지</h2>
+    <div class="lb-sub">회차별 게임 결과 조회 (최대 30회차)</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
+      <select id="admin-session-select" class="name-input" style="margin-bottom:0;flex:1;"></select>
+      <button class="btn-next-stage" style="padding:12px 20px;white-space:nowrap;" onclick="loadAdminSession()">조회</button>
+    </div>
+    <div id="admin-summary" class="info-grid" style="margin-bottom:14px;"></div>
+    <div id="admin-top-scorer" class="rule-box" style="display:none;"></div>
+    <div class="lb-tabs">
+      <button class="lb-tab active" id="admin-tab-all" onclick="renderAdminLB('all')">전체</button>
+      <button class="lb-tab" id="admin-tab-survivor" onclick="renderAdminLB('survivor')">🔔 생존자</button>
+      <button class="lb-tab" id="admin-tab-elim" onclick="renderAdminLB('elim')">💀 탈락자</button>
+    </div>
+    <div class="lb-full-list" id="admin-lb-list"></div>
+    <button class="btn-lb-back" onclick="closeAdminScreen()">← 돌아가기</button>
+  </div>
+</div>
+
+<!-- 폴백: 아래 모듈 스크립트(Firebase) 로딩이 실패해도 버튼 클릭 시 안내 메시지가 뜨도록 기본 함수 정의.
+     정상적으로 모듈이 로드되면 아래 함수들은 실제 구현으로 자동 교체됩니다. -->
+<script>
+(function(){
+  const FALLBACK_MSG = '⚠️ 앱 로딩에 실패했습니다.\n\n원인일 가능성이 높은 것들:\n· 이 파일을 더블클릭(file://)으로 직접 열었을 수 있습니다 → 웹서버(GitHub Pages 등)로 열어주세요.\n· 인터넷 연결이 끊겼거나 광고 차단 확장 프로그램이 Firebase 스크립트를 막았을 수 있습니다.\n\nF12 콘솔에서 빨간색 에러 메시지를 확인해주세요.';
+  const names = ['showNewGameConfirm','cancelNewGame','confirmNewGame','selectGrade','selectDept',
+    'startGame','startStage','nextQuestion','showLeaderboard','goBackFromLB','showTitleScreen','renderLB',
+    'showAdminLogin','cancelAdminLogin','confirmAdminLogin','loadAdminSession','renderAdminLB',
+    'closeAdminScreen','showScreen'];
+  names.forEach(n=>{ window[n] = function(){ alert(FALLBACK_MSG); }; });
+})();
+</script>
 
 <!-- Firebase SDK -->
 <script type="module">
@@ -462,7 +510,18 @@ async function saveLBEntry(entry){
 async function saveGlobalMeta(){
   try {
     await set(globalMetaRef, {sessionNum, totalParticipants});
-  } catch(e){}
+    await saveSessionMeta(sessionNum, totalParticipants);
+  } catch(e){ console.error('메타 저장 오류:', e); }
+}
+
+// ── 회차별 메타(참여자 수 등) 저장 — 관리자 페이지에서 회차별 조회에 사용 ──
+async function saveSessionMeta(n, participants){
+  try {
+    await set(ref(db, `sessions/session_${n}/meta`), {
+      totalParticipants: participants,
+      updatedAt: Date.now()
+    });
+  } catch(e){ console.error('회차 메타 저장 오류:', e); }
 }
 
 // ── 새 게임 ──
@@ -503,6 +562,124 @@ async function confirmNewGame(){
 function updateSessionBadge(){
   document.getElementById('session-badge').textContent = `게임 ${sessionNum}회차`;
   document.getElementById('lb-session-info').textContent = `게임 ${sessionNum}회차 기록`;
+}
+
+// ── 관리자 페이지 ──
+const MAX_SESSIONS = 30;
+let adminSelectedSession = 1;
+let adminLB = [];
+
+function showAdminLogin(){
+  document.getElementById('admin-login-confirm').classList.add('show');
+  document.getElementById('admin-login-pw-input').value='';
+  document.getElementById('admin-login-pw-input').focus();
+}
+function cancelAdminLogin(){
+  document.getElementById('admin-login-confirm').classList.remove('show');
+}
+function confirmAdminLogin(){
+  const pw = document.getElementById('admin-login-pw-input').value;
+  if(pw !== ADMIN_PASSWORD){
+    alert('❌ 비밀번호가 올바르지 않습니다.');
+    document.getElementById('admin-login-pw-input').value='';
+    document.getElementById('admin-login-pw-input').focus();
+    return;
+  }
+  document.getElementById('admin-login-confirm').classList.remove('show');
+  openAdminScreen();
+}
+
+function openAdminScreen(){
+  const sel = document.getElementById('admin-session-select');
+  sel.innerHTML='';
+  const maxOpt = Math.max(MAX_SESSIONS, sessionNum);
+  for(let i=1;i<=maxOpt;i++){
+    const opt=document.createElement('option');
+    opt.value=i;
+    opt.textContent = `${i}회차` + (i===sessionNum?' (현재 진행 중)':'');
+    sel.appendChild(opt);
+  }
+  sel.value = sessionNum;
+  document.getElementById('admin-summary').innerHTML='';
+  document.getElementById('admin-top-scorer').style.display='none';
+  document.getElementById('admin-lb-list').innerHTML='<div class="empty-lb">회차를 선택하고 "조회"를 눌러주세요.</div>';
+  showScreen('admin-screen');
+  loadAdminSession();
+}
+function closeAdminScreen(){
+  showScreen('title-screen');
+}
+
+async function loadAdminSession(){
+  const n = parseInt(document.getElementById('admin-session-select').value, 10);
+  adminSelectedSession = n;
+  const listEl = document.getElementById('admin-lb-list');
+  listEl.innerHTML='<div class="loading-box">불러오는 중...</div>';
+  try{
+    const [metaSnap, lbSnap] = await Promise.all([
+      get(ref(db, `sessions/session_${n}/meta`)),
+      get(ref(db, `sessions/session_${n}/leaderboard`))
+    ]);
+    const meta = metaSnap.exists() ? metaSnap.val() : {totalParticipants:0};
+    adminLB = lbSnap.exists() ? Object.values(lbSnap.val()).filter(v=>v && v.name) : [];
+    adminLB.sort((a,b)=>{
+      if(a.survived!==b.survived)return b.survived-a.survived;
+      if(b.score!==a.score)return b.score-a.score;
+      return b.qReached-a.qReached;
+    });
+
+    const survivors = adminLB.filter(e=>e.survived===1).length;
+    const eliminated = adminLB.filter(e=>e.survived===0).length;
+    const top = adminLB[0];
+
+    document.getElementById('admin-summary').innerHTML = `
+      <div class="admin-summary-card"><div class="num">${meta.totalParticipants||0}</div><div class="label">참여자 수</div></div>
+      <div class="admin-summary-card"><div class="num">${survivors}</div><div class="label">🔔 골든벨 생존</div></div>
+      <div class="admin-summary-card"><div class="num">${eliminated}</div><div class="label">💀 탈락</div></div>
+      <div class="admin-summary-card"><div class="num">${adminLB.length}</div><div class="label">기록된 참여자</div></div>
+    `;
+
+    const topBox = document.getElementById('admin-top-scorer');
+    if(top){
+      topBox.style.display='block';
+      topBox.innerHTML = `🏅 <strong>${n}회차 최고 기록</strong><br>
+        ${top.name} (${top.grade||'-'} ${top.dept||'-'}) · ${top.score}점 · ${top.survived? '골든벨 달성':`${top.stage}단계 ${top.qReached}번에서 탈락`}`;
+    } else {
+      topBox.style.display='block';
+      topBox.innerHTML = `아직 이 회차에 기록된 참여자가 없습니다.`;
+    }
+
+    renderAdminLB('all');
+  } catch(e){
+    console.error('관리자 회차 조회 오류:', e);
+    listEl.innerHTML='<div class="empty-lb">데이터를 불러올 수 없습니다. Firebase 규칙/연결을 확인하세요.</div>';
+  }
+}
+
+function renderAdminLB(tab){
+  ['all','survivor','elim'].forEach(t=>{
+    const el=document.getElementById('admin-tab-'+t);
+    if(el) el.classList.toggle('active', t===tab);
+  });
+  let list=adminLB;
+  if(tab==='survivor')list=adminLB.filter(e=>e.survived===1);
+  if(tab==='elim')list=adminLB.filter(e=>e.survived===0);
+  const el=document.getElementById('admin-lb-list');
+  if(!list.length){el.innerHTML='<div class="empty-lb">해당 조건의 기록이 없습니다.</div>';return;}
+  const medals=['🥇','🥈','🥉'];
+  const rc=i=>i===0?'rank1':i===1?'rank2':i===2?'rank3':'rankN';
+  el.innerHTML=list.map((item,i)=>{
+    const crown=item.survived?'🔔':'💀';
+    const info=item.survived?'전체 통과':`${item.stage}단계 ${item.qReached}번에서 탈락`;
+    const gradeDeptParts = [item.grade, item.dept].filter(Boolean).join(' ');
+    const gradeDept = gradeDeptParts ? ` · ${gradeDeptParts}` : '';
+    return `<div class="lb-full-item ${rc(i)}">
+      <span class="lbf-rank">${medals[i]||((i+1)+'위')}</span>
+      <span class="lbf-name">${item.name} ${crown}</span>
+      <span class="lbf-stage">${info}${gradeDept}</span>
+      <span class="lbf-pts">${item.score}점</span>
+    </div>`;
+  }).join('');
 }
 
 // ── 학년/과 선택 ──
@@ -886,6 +1063,13 @@ window.showLeaderboard=showLeaderboard;
 window.goBackFromLB=goBackFromLB;
 window.showTitleScreen=showTitleScreen;
 window.renderLB=renderLB;
+window.showAdminLogin=showAdminLogin;
+window.cancelAdminLogin=cancelAdminLogin;
+window.confirmAdminLogin=confirmAdminLogin;
+window.loadAdminSession=loadAdminSession;
+window.renderAdminLB=renderAdminLB;
+window.closeAdminScreen=closeAdminScreen;
+window.showScreen=showScreen;
 </script>
 </body>
 </html>
