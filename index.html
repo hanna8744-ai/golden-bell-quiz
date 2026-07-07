@@ -432,7 +432,7 @@ async function initDB(){
       await set(globalMetaRef, {sessionNum:1, totalParticipants:0});
     }
     await loadLB();
-  } catch(e){ console.error('Firebase 초기화 오류:', e); }
+  } catch(e){ console.error('Firebase 초기화 오류 (Realtime Database 규칙이 만료되었을 수 있습니다. Firebase 콘솔 > Realtime Database > 규칙을 확인하세요):', e); }
   updateSessionBadge();
   updateStartButtonState();
 }
@@ -668,6 +668,7 @@ async function updateSurvivorInfo(){
       el.innerHTML = `👥 전체 참여자 <strong>${totalParticipants}</strong>명 중 💀 탈락 <strong class="elim-num">${elimCount}</strong>명`;
     }
   }catch(e){
+    console.error('생존 현황 조회 오류 (Firebase 규칙/네트워크 확인 필요):', e);
     const el = document.getElementById('survivor-info');
     if(el) el.textContent = '생존 현황을 불러올 수 없습니다';
   }
