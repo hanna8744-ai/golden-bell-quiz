@@ -412,6 +412,7 @@ let lbFromScreen='elim';
 let leaderboard=[];
 let sessionNum=1;
 let totalParticipants=0;
+let selectedGrade='', selectedDept='';
 
 // ── Firebase DB 경로 ──
 const dbRef = () => ref(db, `sessions/session_${sessionNum}`);
@@ -433,8 +434,7 @@ async function initDB(){
     await loadLB();
   } catch(e){ console.error('Firebase 초기화 오류:', e); }
   updateSessionBadge();
-  document.getElementById('btn-start').disabled =
-    document.getElementById('name-input').value.trim().length < 1;
+  updateStartButtonState();
 }
 
 async function loadLB(){
@@ -496,13 +496,38 @@ async function confirmNewGame(){
   document.getElementById('new-game-confirm').classList.remove('show');
   updateSessionBadge();
   document.getElementById('name-input').value = '';
-  document.getElementById('btn-start').disabled = true;
+  resetParticipantForm();
   alert(`🔄 새 게임(${sessionNum}회차)이 시작됩니다!\n순위 기록이 초기화되었습니다.`);
 }
 
 function updateSessionBadge(){
   document.getElementById('session-badge').textContent = `게임 ${sessionNum}회차`;
   document.getElementById('lb-session-info').textContent = `게임 ${sessionNum}회차 기록`;
+}
+
+// ── 학년/과 선택 ──
+function selectGrade(btn, val){
+  selectedGrade = val;
+  document.querySelectorAll('#grade-group .sel-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  updateStartButtonState();
+}
+function selectDept(btn, val){
+  selectedDept = val;
+  document.querySelectorAll('#dept-group .sel-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  updateStartButtonState();
+}
+function updateStartButtonState(){
+  const name = document.getElementById('name-input').value.trim();
+  document.getElementById('btn-start').disabled =
+    !(selectedGrade && selectedDept && name.length>=1);
+}
+function resetParticipantForm(){
+  selectedGrade=''; selectedDept='';
+  document.querySelectorAll('#grade-group .sel-btn, #dept-group .sel-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('name-input').value='';
+  updateStartButtonState();
 }
 
 // ── SCREEN ──
@@ -514,16 +539,17 @@ function showTitleScreen(){
   clearTmr();
   currentStage=0; currentQ=0; score=0; stageScores=[0,0,0,0,0];
   updateSessionBadge();
+  resetParticipantForm();
   showScreen('title-screen');
 }
 
 document.getElementById('name-input').addEventListener('input', function(){
-  document.getElementById('btn-start').disabled = this.value.trim().length < 1;
+  updateStartButtonState();
 });
 
 async function startGame(){
   playerName = document.getElementById('name-input').value.trim();
-  if(!playerName) return;
+  if(!playerName || !selectedGrade || !selectedDept) return;
   totalParticipants++;
   await saveGlobalMeta();
   showStageIntro(0);
@@ -724,7 +750,7 @@ function nextQuestion(){
 async function eliminatePlayer(isTimeout, wrongQ){
   const qNum=globalQNum();
   const entry={
-    name:playerName, score, qReached:qNum, survived:0,
+    name:playerName, grade:selectedGrade, dept:selectedDept, score, qReached:qNum, survived:0,
     stage:STAGES[currentStage].id, reason:isTimeout?'시간초과':'오답',
     time:Date.now()
   };
@@ -776,7 +802,7 @@ function showAllEliminatedScreen(){
 // ── CLEAR ──
 async function clearPlayer(){
   const entry={
-    name:playerName, score, qReached:50, survived:1,
+    name:playerName, grade:selectedGrade, dept:selectedDept, score, qReached:50, survived:1,
     stage:5, reason:'생존', time:Date.now()
   };
   await saveLBEntry(entry);
@@ -850,6 +876,8 @@ initDB();
 window.showNewGameConfirm=showNewGameConfirm;
 window.cancelNewGame=cancelNewGame;
 window.confirmNewGame=confirmNewGame;
+window.selectGrade=selectGrade;
+window.selectDept=selectDept;
 window.startGame=startGame;
 window.startStage=startStage;
 window.nextQuestion=nextQuestion;
