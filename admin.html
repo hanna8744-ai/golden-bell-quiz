@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>골든벨 관리자 페이지</title>
+<!-- SheetJS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{--gold:#FFD700;--dark-gold:#B8860B;--navy:#1a2744;--blue:#2563eb;--green:#16a34a;--red:#dc2626;--gray:#64748b;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',sans-serif;background:#f1f5f9;min-height:100vh;color:#222;}
+
+  /* 로그인 */
+  #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+  .login-box{background:white;border-radius:20px;padding:40px 36px;max-width:400px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.12);text-align:center;}
+  .login-box .icon{font-size:52px;display:block;margin-bottom:12px;}
+  .login-box h1{font-size:1.5rem;font-weight:900;color:var(--navy);margin-bottom:6px;}
+  .login-box p{font-size:0.85rem;color:var(--gray);margin-bottom:24px;}
+  .pw-input{width:100%;padding:13px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;outline:none;margin-bottom:12px;}
+  .pw-input:focus{border-color:var(--blue);}
+  .btn-login{width:100%;padding:14px;background:linear-gradient(135deg,var(--navy),var(--blue));border:none;border-radius:12px;color:white;font-size:1rem;font-weight:800;cursor:pointer;}
+  .btn-login:hover{opacity:0.9;}
+  .login-error{color:var(--red);font-size:0.83rem;margin-top:8px;display:none;}
+
+  /* 관리자 */
+  #admin-screen{display:none;min-height:100vh;}
+  .top-bar{background:linear-gradient(135deg,var(--navy),var(--blue));color:white;padding:16px 28px;display:flex;justify-content:space-between;align-items:center;}
+  .top-bar h1{font-size:1.15rem;font-weight:900;}
+  .top-bar .right{display:flex;gap:10px;align-items:center;}
+  .btn-logout{background:rgba(255,255,255,0.2);border:none;border-radius:8px;color:white;padding:7px 14px;font-size:0.8rem;font-weight:700;cursor:pointer;}
+  .btn-logout:hover{background:rgba(255,255,255,0.3);}
+
+  .content{padding:24px 28px;max-width:1100px;margin:0 auto;}
+
+  /* 세션 선택 */
+  .session-bar{background:white;border-radius:14px;padding:18px 22px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.06);display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .session-bar label{font-weight:800;font-size:0.88rem;color:var(--navy);}
+  .session-select{padding:9px 14px;border:2px solid #e2e8f0;border-radius:10px;font-size:0.88rem;outline:none;color:var(--navy);font-weight:600;cursor:pointer;}
+  .session-select:focus{border-color:var(--blue);}
+  .btn-load{padding:9px 20px;background:var(--blue);border:none;border-radius:10px;color:white;font-size:0.85rem;font-weight:700;cursor:pointer;}
+  .btn-load:hover{background:#1d4ed8;}
+  .btn-excel{padding:9px 20px;background:var(--green);border:none;border-radius:10px;color:white;font-size:0.85rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;}
+  .btn-excel:hover{background:#15803d;}
+  .btn-excel:disabled{opacity:0.4;cursor:not-allowed;}
+
+  /* 요약 카드 */
+  .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+  .sum-card{background:white;border-radius:14px;padding:16px 18px;box-shadow:0 2px 10px rgba(0,0,0,0.06);}
+  .sum-card .num{font-size:1.8rem;font-weight:900;color:var(--blue);}
+  .sum-card .label{font-size:0.75rem;color:var(--gray);margin-top:2px;}
+
+  /* 필터 */
+  .filter-bar{background:white;border-radius:14px;padding:14px 20px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.06);display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .filter-bar label{font-size:0.82rem;font-weight:700;color:var(--navy);}
+  .filter-select{padding:7px 12px;border:2px solid #e2e8f0;border-radius:8px;font-size:0.82rem;outline:none;cursor:pointer;}
+  .filter-select:focus{border-color:var(--blue);}
+  .btn-reset{padding:7px 14px;background:#f1f5f9;border:none;border-radius:8px;font-size:0.82rem;font-weight:700;color:var(--gray);cursor:pointer;}
+
+  /* 테이블 */
+  .table-wrap{background:white;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,0.06);overflow:hidden;}
+  .table-wrap table{width:100%;border-collapse:collapse;font-size:0.83rem;}
+  .table-wrap th{background:#f0f4ff;color:var(--navy);font-weight:800;padding:11px 14px;text-align:left;white-space:nowrap;}
+  .table-wrap td{padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;}
+  .table-wrap tr:last-child td{border-bottom:none;}
+  .table-wrap tr:hover td{background:#fafbff;}
+  .rank-badge{display:inline-block;padding:2px 10px;border-radius:20px;font-weight:800;font-size:0.75rem;}
+  .rank-1{background:#fff9e6;color:#B8860B;border:1.5px solid #FFD700;}
+  .rank-2{background:#f4f4f4;color:#555;border:1.5px solid #C0C0C0;}
+  .rank-3{background:#fff0e8;color:#7a3b00;border:1.5px solid #CD7F32;}
+  .rank-n{background:#f1f5f9;color:#64748b;}
+  .survived-badge{background:#f0fdf4;color:var(--green);border:1.5px solid #86efac;padding:2px 9px;border-radius:20px;font-size:0.73rem;font-weight:700;}
+  .elim-badge{background:#fef2f2;color:var(--red);border:1.5px solid #fca5a5;padding:2px 9px;border-radius:20px;font-size:0.73rem;font-weight:700;}
+
+  .empty-msg{text-align:center;padding:48px;color:var(--gray);font-size:0.9rem;}
+  .loading-msg{text-align:center;padding:48px;color:var(--blue);font-size:0.9rem;}
+</style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<div id="login-screen">
+  <div class="login-box">
+    <span class="icon">🔐</span>
+    <h1>관리자 로그인</h1>
+    <p>골든벨 퀴즈 관리자 페이지입니다</p>
+    <input class="pw-input" id="pw-input" type="password" placeholder="비밀번호를 입력하세요">
+    <button class="btn-login" id="btn-login">로그인</button>
+    <div class="login-error" id="login-error">❌ 비밀번호가 올바르지 않습니다.</div>
+  </div>
+</div>
+
+<!-- 관리자 화면 -->
+<div id="admin-screen">
+  <div class="top-bar">
+    <h1>🔔 골든벨 퀴즈 관리자 페이지</h1>
+    <div class="right">
+      <span id="top-session-label" style="font-size:0.82rem;opacity:0.8;"></span>
+      <button class="btn-logout" id="btn-logout">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- 세션 선택 -->
+    <div class="session-bar">
+      <label>게임 회차 선택</label>
+      <select class="session-select" id="session-select"></select>
+      <button class="btn-load" id="btn-load">📂 불러오기</button>
+      <button class="btn-excel" id="btn-excel" disabled>⬇ 엑셀 다운로드</button>
+    </div>
+
+    <!-- 요약 -->
+    <div class="summary-grid">
+      <div class="sum-card"><div class="num" id="sum-total">-</div><div class="label">총 참여자</div></div>
+      <div class="sum-card"><div class="num" id="sum-survivor" style="color:var(--green)">-</div><div class="label">🔔 생존자(골든벨)</div></div>
+      <div class="sum-card"><div class="num" id="sum-elim" style="color:var(--red)">-</div><div class="label">💀 탈락자</div></div>
+      <div class="sum-card"><div class="num" id="sum-avg">-</div><div class="label">평균 점수</div></div>
+    </div>
+
+    <!-- 필터 -->
+    <div class="filter-bar">
+      <label>학년</label>
+      <select class="filter-select" id="filter-grade">
+        <option value="">전체</option>
+        <option>1학년</option>
+        <option>2학년</option>
+        <option>3학년</option>
+      </select>
+      <label>과</label>
+      <select class="filter-select" id="filter-dept">
+        <option value="">전체</option>
+        <option>시각디자인과</option>
+        <option>콘텐츠디자인과</option>
+        <option>게임그래픽디자인과</option>
+        <option>만화애니메이션과</option>
+        <option>패션스타일리스트과</option>
+      </select>
+      <label>결과</label>
+      <select class="filter-select" id="filter-result">
+        <option value="">전체</option>
+        <option value="1">🔔 생존(골든벨)</option>
+        <option value="0">💀 탈락</option>
+      </select>
+      <button class="btn-reset" id="btn-reset">초기화</button>
+    </div>
+
+    <!-- 테이블 -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>순위</th>
+            <th>학년</th>
+            <th>과</th>
+            <th>이름</th>
+            <th>점수</th>
+            <th>진행 문제</th>
+            <th>탈락 단계</th>
+            <th>탈락 사유</th>
+            <th>결과</th>
+          </tr>
+        </thead>
+        <tbody id="result-tbody">
+          <tr><td colspan="9" class="empty-msg">회차를 선택하고 불러오기를 눌러주세요.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBT8yXBaLulPjQGgv_wiDyRhcM4LC1CgE8",
+  authDomain: "golden-bell-quiz.firebaseapp.com",
+  databaseURL: "https://golden-bell-quiz-default-rtdb.firebaseio.com",
+  projectId: "golden-bell-quiz",
+  storageBucket: "golden-bell-quiz.firebasestorage.app",
+  messagingSenderId: "544242063266",
+  appId: "1:544242063266:web:bbb221a1660f088d1ac4fb"
+};
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+const ADMIN_PW = 'welcome';
+let allData = [];   // 현재 불러온 전체 데이터
+let sessionNum = 1;
+
+// ── 로그인 ──
+document.getElementById('btn-login').addEventListener('click', doLogin);
+document.getElementById('pw-input').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+
+function doLogin(){
+  if(document.getElementById('pw-input').value === ADMIN_PW){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('admin-screen').style.display='block';
+    initAdmin();
+  } else {
+    document.getElementById('login-error').style.display='block';
+    document.getElementById('pw-input').value='';
+  }
+}
+
+document.getElementById('btn-logout').addEventListener('click',()=>{
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('admin-screen').style.display='none';
+  document.getElementById('pw-input').value='';
+  document.getElementById('login-error').style.display='none';
+});
+
+// ── 초기화: 세션 목록 로드 ──
+async function initAdmin(){
+  try{
+    const snap = await get(ref(db,'global_meta'));
+    if(snap.exists()){
+      sessionNum = snap.val().sessionNum || 1;
+    }
+    const sel = document.getElementById('session-select');
+    sel.innerHTML='';
+    for(let i=sessionNum;i>=1;i--){
+      const opt=document.createElement('option');
+      opt.value=i; opt.textContent=`${i}회차`;
+      sel.appendChild(opt);
+    }
+  }catch(e){ console.error(e); }
+}
+
+// ── 데이터 불러오기 ──
+document.getElementById('btn-load').addEventListener('click', loadData);
+
+async function loadData(){
+  const selVal = parseInt(document.getElementById('session-select').value);
+  const tbody = document.getElementById('result-tbody');
+  tbody.innerHTML='<tr><td colspan="9" class="loading-msg">⏳ 데이터를 불러오는 중...</td></tr>';
+  document.getElementById('btn-excel').disabled=true;
+  try{
+    const snap = await get(ref(db,`sessions/session_${selVal}/leaderboard`));
+    if(!snap.exists()||!snap.val()){
+      tbody.innerHTML='<tr><td colspan="9" class="empty-msg">이 회차의 데이터가 없습니다.</td></tr>';
+      updateSummary([]);
+      return;
+    }
+    allData = Object.values(snap.val()).filter(v=>v&&v.name);
+    // 순위 정렬
+    allData.sort((a,b)=>{
+      if(a.survived!==b.survived) return b.survived-a.survived;
+      if(b.score!==a.score) return b.score-a.score;
+      return b.qReached-a.qReached;
+    });
+    document.getElementById('top-session-label').textContent=`${selVal}회차 데이터`;
+    updateSummary(allData);
+    renderTable(allData);
+    document.getElementById('btn-excel').disabled=false;
+  }catch(e){
+    console.error(e);
+    tbody.innerHTML='<tr><td colspan="9" class="empty-msg">데이터를 불러오는 중 오류가 발생했습니다.</td></tr>';
+  }
+}
+
+// ── 요약 ──
+function updateSummary(data){
+  const total=data.length;
+  const surv=data.filter(d=>d.survived===1).length;
+  const elim=data.filter(d=>d.survived===0).length;
+  const avg=total>0?Math.round(data.reduce((s,d)=>s+d.score,0)/total):0;
+  document.getElementById('sum-total').textContent=total;
+  document.getElementById('sum-survivor').textContent=surv;
+  document.getElementById('sum-elim').textContent=elim;
+  document.getElementById('sum-avg').textContent=avg+'점';
+}
+
+// ── 이름 파싱 (학년 과 이름) ──
+function parseName(fullName){
+  const parts = fullName.trim().split(' ');
+  // "1학년 시각디자인과 홍길동" 형태
+  if(parts.length>=3){
+    return { grade:parts[0], dept:parts[1], name:parts.slice(2).join(' ') };
+  } else if(parts.length===2){
+    return { grade:parts[0], dept:'', name:parts[1] };
+  }
+  return { grade:'', dept:'', name:fullName };
+}
+
+// ── 테이블 렌더 ──
+function renderTable(data){
+  const tbody=document.getElementById('result-tbody');
+  if(!data.length){
+    tbody.innerHTML='<tr><td colspan="9" class="empty-msg">해당 조건의 데이터가 없습니다.</td></tr>';
+    return;
+  }
+  const medals=['🥇','🥈','🥉'];
+  tbody.innerHTML=data.map((item,i)=>{
+    const rank=i+1;
+    const rClass=rank===1?'rank-1':rank===2?'rank-2':rank===3?'rank-3':'rank-n';
+    const rLabel=medals[i]||(rank+'위');
+    const p=parseName(item.name);
+    const resultBadge=item.survived===1
+      ?'<span class="survived-badge">🔔 골든벨</span>'
+      :'<span class="elim-badge">💀 탈락</span>';
+    const reason=item.survived===1?'완주':item.reason||'-';
+    return `<tr>
+      <td><span class="rank-badge ${rClass}">${rLabel}</span></td>
+      <td>${p.grade||'-'}</td>
+      <td>${p.dept||'-'}</td>
+      <td><strong>${p.name}</strong></td>
+      <td><strong>${item.score}점</strong></td>
+      <td>${item.qReached}번</td>
+      <td>${item.survived===1?'완주':item.stage+'단계'}</td>
+      <td>${reason}</td>
+      <td>${resultBadge}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── 필터 ──
+function applyFilter(){
+  const grade=document.getElementById('filter-grade').value;
+  const dept=document.getElementById('filter-dept').value;
+  const result=document.getElementById('filter-result').value;
+  let filtered=allData;
+  if(grade) filtered=filtered.filter(d=>parseName(d.name).grade===grade);
+  if(dept)  filtered=filtered.filter(d=>parseName(d.name).dept===dept);
+  if(result!=='') filtered=filtered.filter(d=>String(d.survived)===result);
+  renderTable(filtered);
+  updateSummary(filtered);
+}
+document.getElementById('filter-grade').addEventListener('change',applyFilter);
+document.getElementById('filter-dept').addEventListener('change',applyFilter);
+document.getElementById('filter-result').addEventListener('change',applyFilter);
+document.getElementById('btn-reset').addEventListener('click',()=>{
+  document.getElementById('filter-grade').value='';
+  document.getElementById('filter-dept').value='';
+  document.getElementById('filter-result').value='';
+  renderTable(allData);
+  updateSummary(allData);
+});
+
+// ── 엑셀 다운로드 ──
+document.getElementById('btn-excel').addEventListener('click',()=>{
+  if(!allData.length) return;
+  const selVal=document.getElementById('session-select').value;
+
+  // 전체 시트 데이터
+  const rows=allData.map((item,i)=>{
+    const p=parseName(item.name);
+    return {
+      '순위': i+1,
+      '학년': p.grade||'-',
+      '과': p.dept||'-',
+      '이름': p.name,
+      '점수': item.score,
+      '진행 문제 번호': item.qReached+'번',
+      '탈락 단계': item.survived===1?'완주':item.stage+'단계',
+      '탈락 사유': item.survived===1?'완주':item.reason||'-',
+      '결과': item.survived===1?'골든벨':'탈락',
+    };
+  });
+
+  // 학년별 시트용
+  const grades=['1학년','2학년','3학년'];
+
+  const wb=XLSX.utils.book_new();
+
+  // 전체 시트
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:6},{wch:8},{wch:18},{wch:10},{wch:8},{wch:14},{wch:10},{wch:10},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws,'전체 결과');
+
+  // 학년별 시트
+  grades.forEach(g=>{
+    const gRows=rows.filter(r=>r['학년']===g);
+    if(gRows.length>0){
+      const gws=XLSX.utils.json_to_sheet(gRows);
+      gws['!cols']=[{wch:6},{wch:8},{wch:18},{wch:10},{wch:8},{wch:14},{wch:10},{wch:10},{wch:10}];
+      XLSX.utils.book_append_sheet(wb,gws,g);
+    }
+  });
+
+  // 과별 시트
+  const depts=['시각디자인과','콘텐츠디자인과','게임그래픽디자인과','만화애니메이션과','패션스타일리스트과'];
+  depts.forEach(d=>{
+    const dRows=rows.filter(r=>r['과']===d);
+    if(dRows.length>0){
+      const dws=XLSX.utils.json_to_sheet(dRows);
+      dws['!cols']=[{wch:6},{wch:8},{wch:18},{wch:10},{wch:8},{wch:14},{wch:10},{wch:10},{wch:10}];
+      XLSX.utils.book_append_sheet(wb,dws,d.length>15?d.substring(0,14):d);
+    }
+  });
+
+  XLSX.writeFile(wb,`골든벨_${selVal}회차_결과.xlsx`);
+});
+</script>
+</body>
+</html>
