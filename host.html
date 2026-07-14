@@ -30,6 +30,9 @@
   .back-link{display:inline-block;margin-top:14px;color:var(--gray);font-size:0.8rem;text-decoration:none;}
   .back-link:hover{text-decoration:underline;}
   .warn-box{background:#fff3cd;border:2px solid var(--gold);border-radius:10px;padding:10px 14px;font-size:0.78rem;color:#7a5700;margin-bottom:14px;line-height:1.6;}
+  .timer-display{text-align:center;font-size:3.2rem;font-weight:900;color:var(--teal);margin-bottom:14px;font-variant-numeric:tabular-nums;}
+  .timer-display.warn{color:#ca8a04;}
+  .timer-display.danger{color:var(--red);}
 </style>
 </head>
 <body>
@@ -49,8 +52,9 @@
   <div class="warn-box">⚠️ 이 페이지는 <strong>live.html</strong>에 접속한 참가자만 조작합니다. 기존 <strong>index.html</strong> 참가자는 영향받지 않습니다.</div>
   <div class="session-badge" id="session-badge">게임 불러오는 중...</div>
   <div class="info-grid" id="summary"></div>
+  <div class="timer-display hidden" id="timer-display">30</div>
   <div class="question-box" id="question-box">게임을 시작할 준비가 되면 아래 버튼을 눌러주세요.</div>
-  <button class="btn-primary" id="advance-btn" onclick="advance()">▶ 게임 시작 (1번 문제 공개)</button>
+  <button class="btn-primary" id="advance-btn" onclick="handleAdvanceClick()">▶ 게임 시작 (1번 문제 공개)</button>
   <a href="live.html" class="back-link">← 참가자(실시간 진행) 페이지로</a>
 </div>
 
@@ -151,6 +155,11 @@ let controlUnsub = null;
 const globalMetaRef = ref(db, 'global_meta');
 const controlRef = () => ref(db, `sessions/session_${sessionNum}/control`);
 
+let controlPhase = 'idle';   // idle | shown | active | reveal
+let controlStartTime = null;
+let hostTickInterval = null;
+let hostRevealTimeout = null;
+
 function tryLogin(){
   const pw = document.getElementById('login-pw-input').value;
   const errBox = document.getElementById('login-error');
@@ -192,8 +201,10 @@ function startWatching(){
 function watchControl(){
   if(controlUnsub){ controlUnsub(); controlUnsub=null; }
   controlUnsub = onValue(controlRef(), (snap)=>{
-    const data = snap.exists() ? snap.val() : {globalQ:-1};
+    const data = snap.exists() ? snap.val() : {globalQ:-1, phase:'idle', startTime:null};
     controlGQ = (data.globalQ===undefined || data.globalQ===null) ? -1 : data.globalQ;
+    controlPhase = data.phase || (controlGQ<0 ? 'idle' : 'shown');
+    controlStartTime = data.startTime || null;
     renderControl();
   }, (err)=>{
     console.error('진행 상태 조회 오류:', err);
@@ -201,22 +212,62 @@ function watchControl(){
   });
 }
 
+function clearHostTimers(){
+  if(hostTickInterval){ clearInterval(hostTickInterval); hostTickInterval=null; }
+  if(hostRevealTimeout){ clearTimeout(hostRevealTimeout); hostRevealTimeout=null; }
+}
+
 function renderControl(){
+  clearHostTimers();
   const box = document.getElementById('question-box');
   const btn = document.getElementById('advance-btn');
   const summary = document.getElementById('summary');
+  const timerDisp = document.getElementById('timer-display');
+  timerDisp.classList.add('hidden');
+
   summary.innerHTML = `
     <div class="info-card"><div class="num">${totalParticipants}</div><div class="label">참여자 수</div></div>
     <div class="info-card"><div class="num">${controlGQ<0?'대기 중':(controlGQ>=50?'종료':(controlGQ+1)+' / 50')}</div><div class="label">진행 상황</div></div>
   `;
+
   if(controlGQ < 0){
-    box.innerHTML = `게임을 시작할 준비가 되면 아래 버튼을 눌러주세요.<br>버튼을 누르는 즉시 live.html에 접속한 모든 참가자의 화면이 1번 문제로 전환됩니다.`;
+    box.innerHTML = `게임을 시작할 준비가 되면 아래 버튼을 눌러주세요.<br>버튼을 누르는 즉시 live.html에 접속한 모든 참가자의 화면에 1번 문제가 표시됩니다 (타이머는 아직 시작되지 않아요).`;
     btn.textContent = '▶ 게임 시작 (1번 문제 공개)';
     btn.disabled=false;
-  } else if(controlGQ < 50){
-    const stageIdx = Math.floor(controlGQ/10), qIdx = controlGQ%10;
-    const s = STAGES[stageIdx], q = s.questions[qIdx];
-    const answerText = s.type==='ox' ? (q.answer==='O'?'O (⭕)':'X (❌)') : `${'①②③④'[q.answer]} ${q.opts[q.answer]}`;
+    return;
+  }
+  if(controlGQ >= 50){
+    box.innerHTML = `🏁 모든 문제가 종료되었습니다. 아직 생존한 참가자는 골든벨을 달성한 것으로 처리됩니다.`;
+    btn.textContent = '✅ 진행 완료';
+    btn.disabled=true;
+    return;
+  }
+
+  const stageIdx = Math.floor(controlGQ/10), qIdx = controlGQ%10;
+  const s = STAGES[stageIdx], q = s.questions[qIdx];
+  const answerText = s.type==='ox' ? (q.answer==='O'?'O (⭕)':'X (❌)') : `${'①②③④'[q.answer]} ${q.opts[q.answer]}`;
+
+  if(controlPhase === 'shown'){
+    box.innerHTML = `
+      <strong>${s.id}단계 ${qIdx+1}번 문제 (전체 ${controlGQ+1}/50)</strong><br><br>
+      ${q.q}
+      ${s.type==='mc' ? '<br><br>' + q.opts.map((o,i)=>`${'①②③④'[i]} ${o}`).join('<br>') : ''}
+      <br><br><em style="color:#94a3b8;">정답과 해설은 타이머가 끝나면 표시됩니다.</em>
+    `;
+    btn.textContent = '⏱ 문제 풀기 시작 (30초 타이머)';
+    btn.disabled=false;
+  } else if(controlPhase === 'active'){
+    box.innerHTML = `
+      <strong>${s.id}단계 ${qIdx+1}번 문제 (전체 ${controlGQ+1}/50)</strong><br><br>
+      ${q.q}
+      ${s.type==='mc' ? '<br><br>' + q.opts.map((o,i)=>`${'①②③④'[i]} ${o}`).join('<br>') : ''}
+      <br><br><em style="color:#94a3b8;">⏳ 참가자들이 답변 중입니다...</em>
+    `;
+    btn.textContent = '⏳ 타이머 진행 중...';
+    btn.disabled=true;
+    timerDisp.classList.remove('hidden');
+    runHostCountdown(q, s, stageIdx, qIdx);
+  } else { // reveal
     box.innerHTML = `
       <strong>${s.id}단계 ${qIdx+1}번 문제 (전체 ${controlGQ+1}/50)</strong><br><br>
       ${q.q}<br><br>
@@ -226,19 +277,49 @@ function renderControl(){
     `;
     btn.textContent = controlGQ===49 ? '🏁 골든벨 종료 (결과 확정)' : `다음 퀴즈 → (${controlGQ+2}번 문제 공개)`;
     btn.disabled=false;
-  } else {
-    box.innerHTML = `🏁 모든 문제가 종료되었습니다. 아직 생존한 참가자는 골든벨을 달성한 것으로 처리됩니다.`;
-    btn.textContent = '✅ 진행 완료';
-    btn.disabled=true;
   }
 }
 
-window.advance = async function(){
-  const next = controlGQ < 0 ? 0 : controlGQ + 1;
+function runHostCountdown(q, s, stageIdx, qIdx){
+  const timerDisp = document.getElementById('timer-display');
+  const totalTime = s.timeLimit || 30;
+  const startedAt = controlStartTime || Date.now();
+  const capturedGQ = controlGQ; // 이 카운트다운이 어떤 문제에 속한 것인지 고정
+
+  function tick(){
+    const elapsed = (Date.now() - startedAt) / 1000;
+    const remaining = Math.max(0, Math.ceil(totalTime - elapsed));
+    timerDisp.textContent = remaining;
+    timerDisp.classList.toggle('warn', remaining<=10 && remaining>5);
+    timerDisp.classList.toggle('danger', remaining<=5);
+    if(remaining <= 0){
+      clearHostTimers();
+      // 아직 이 문제(capturedGQ)에 대한 것이고 phase가 여전히 active일 때만 reveal로 전환
+      if(controlGQ===capturedGQ && controlPhase==='active'){
+        set(controlRef(), {globalQ:capturedGQ, phase:'reveal', startTime:startedAt, updatedAt:Date.now()})
+          .catch(e=>console.error('reveal 전환 오류:', e));
+      }
+    }
+  }
+  tick();
+  hostTickInterval = setInterval(tick, 250);
+}
+
+window.handleAdvanceClick = async function(){
   const btn = document.getElementById('advance-btn');
   btn.disabled = true;
   try{
-    await set(controlRef(), {globalQ: next, updatedAt: Date.now()});
+    if(controlGQ < 0){
+      // 게임 시작 -> 1번 문제를 '보여주기만' 하는 상태로 공개
+      await set(controlRef(), {globalQ:0, phase:'shown', startTime:null, updatedAt:Date.now()});
+    } else if(controlPhase === 'shown'){
+      // 타이머 시작
+      await set(controlRef(), {globalQ:controlGQ, phase:'active', startTime:Date.now(), updatedAt:Date.now()});
+    } else if(controlPhase === 'reveal'){
+      // 다음 문제로 (또는 종료)
+      const next = controlGQ + 1;
+      await set(controlRef(), {globalQ: next, phase: next>=50 ? 'finished' : 'shown', startTime:null, updatedAt:Date.now()});
+    }
   }catch(e){
     console.error('진행 상태 저장 오류:', e);
     alert('진행 상태 저장에 실패했습니다. 네트워크 또는 Firebase 규칙을 확인해주세요.');
