@@ -93,10 +93,6 @@
   .btn-next-q.show{display:block;}
   .btn-next-q:hover{background:var(--blue);}
   .btn-next-q.status{cursor:default;background:#94a3b8 !important;}
-  .lock-notice{display:none;background:#fff7ed;border:2px solid #fed7aa;color:#9a3412;border-radius:12px;padding:10px 14px;font-size:0.82rem;font-weight:700;text-align:center;margin-bottom:12px;}
-  .lock-notice.show{display:block;}
-  .opt-btn.locked{opacity:0.5;cursor:not-allowed;}
-  .opt-btn.locked:hover{border-color:#e2e8f0;background:white;transform:none;}
   .waiting-pulse{animation:pulse 1.6s ease-in-out infinite;}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
   #elim-screen{text-align:center;}
@@ -280,7 +276,6 @@
       <div class="timer-text" id="timer-text">20</div>
     </div>
     <div class="question-text" id="question-text"></div>
-    <div class="lock-notice" id="lock-notice">⏳ 진행자가 타이머를 시작하면 답변할 수 있어요. 잠시만 기다려주세요!</div>
     <div class="options-grid" id="options-grid"></div>
     <div class="feedback-box" id="feedback-box"></div>
     <button class="btn-next-q" id="btn-next-q"></button>
@@ -809,7 +804,7 @@ let pendingStartTime = null;
 function handleControlUpdate(data){
   if(playerState==='eliminated' || playerState==='cleared') return; // 결과가 정해진 참가자는 무시
   const gq = (data.globalQ===undefined || data.globalQ===null) ? -1 : data.globalQ;
-  const phase = data.phase || (gq<0 ? 'idle' : 'shown');
+  const phase = data.phase || (gq<0 ? 'idle' : 'active');
   const startTime = data.startTime || null;
   const key = gq+':'+phase+':'+(startTime||0);
   if(key === lastRenderedKey) return; // 중복 이벤트 무시
@@ -843,20 +838,18 @@ function handleControlUpdate(data){
       pendingPhase = phase; pendingStartTime = startTime;
       showStageIntroAuto(newStage, ()=>{
         stageIntroPending = false;
-        renderQuestionLocked();
-        if(pendingPhase==='active') unlockAndStartTimer(pendingStartTime);
-        else if(pendingPhase==='reveal') forceTimeoutIfNeeded();
+        renderQuestion(pendingPhase, pendingStartTime);
       });
       return;
     } else {
       showScreen('quiz-screen');
-      renderQuestionLocked();
+      renderQuestion(phase, startTime);
+      return;
     }
   }
 
-  if(phase==='active'){
-    unlockAndStartTimer(startTime);
-  } else if(phase==='reveal'){
+  // 같은 문제 내에서 phase만 바뀐 경우 (진행자 쪽 30초 타이머 종료 -> reveal 신호, 안전망)
+  if(phase==='reveal'){
     forceTimeoutIfNeeded();
   }
 }
@@ -911,8 +904,8 @@ function showStageIntroAuto(si, onDone){
   }, 2500);
 }
 
-// ── QUIZ: 문제를 잠금 상태로 표시 (진행자가 타이머를 시작하기 전) ──
-function renderQuestionLocked(){
+// ── QUIZ: 문제 표시와 동시에 타이머 시작 (진행자가 공개한 시각(startTime) 기준으로 모두 동기화) ──
+function renderQuestion(phase, startTime){
   clearTmr(); answered=false;
   const s=STAGES[currentStage], q=s.questions[currentQ];
   const total=50, done=STAGES.slice(0,currentStage).reduce((a,x)=>a+x.questions.length,0)+currentQ;
@@ -926,15 +919,13 @@ function renderQuestionLocked(){
   fb.className='feedback-box'; fb.innerHTML='';
   const nb=document.getElementById('btn-next-q');
   nb.className='btn-next-q'; nb.textContent=''; nb.style.background=''; nb.onclick=null;
-  document.getElementById('lock-notice').classList.add('show');
   const grid=document.getElementById('options-grid');
   grid.innerHTML='';
   if(s.type==='ox'){
     grid.className='options-grid ox';
     ['O','X'].forEach(val=>{
       const btn=document.createElement('button');
-      btn.className='opt-btn ox-btn locked';
-      btn.disabled=true;
+      btn.className='opt-btn ox-btn';
       btn.textContent=val==='O'?'⭕':'❌';
       btn.onclick=()=>selectAnswer(val,btn);
       grid.appendChild(btn);
@@ -943,26 +934,23 @@ function renderQuestionLocked(){
     grid.className='options-grid';
     ['①','②','③','④'].forEach((lbl,i)=>{
       const btn=document.createElement('button');
-      btn.className='opt-btn locked';
-      btn.disabled=true;
+      btn.className='opt-btn';
       btn.innerHTML=`<span class="opt-label">${lbl}</span>${q.opts[i]}`;
       btn.onclick=()=>selectAnswer(i,btn);
       grid.appendChild(btn);
     });
   }
-  timerRemaining=s.timeLimit;
-  updateTimerUI(timerRemaining, s.timeLimit);
-}
 
-// ── 진행자가 '문제 풀기 시작'을 누르면 잠금 해제 + 타이머 시작 (모든 참가자 동시 동기화) ──
-function unlockAndStartTimer(startTime){
-  if(answered) return;
-  const s=STAGES[currentStage];
-  document.getElementById('lock-notice').classList.remove('show');
-  document.querySelectorAll('.opt-btn').forEach(b=>{ b.classList.remove('locked'); b.disabled=false; });
-
-  clearTmr();
   const totalTime = s.timeLimit;
+
+  // 뒤늦게 접속해 이미 정답이 공개(reveal)된 상태를 맞이한 경우 -> 바로 시간 초과 처리
+  if(phase==='reveal'){
+    timerRemaining = 0;
+    updateTimerUI(0, totalTime);
+    timeoutQ();
+    return;
+  }
+
   const startedAt = startTime || Date.now();
   const elapsed = (Date.now() - startedAt) / 1000;
   timerRemaining = Math.max(0, Math.ceil(totalTime - elapsed));
@@ -979,11 +967,9 @@ function unlockAndStartTimer(startTime){
   },1000);
 }
 
-// ── 뒤늦게 접속해 이미 정답 공개(reveal) 상태를 맞이한 경우, 시간 초과로 처리 ──
+// ── 진행자 쪽 30초 타이머 종료(reveal) 신호가 왔는데 아직 답을 안 한 경우 안전망으로 시간 초과 처리 ──
 function forceTimeoutIfNeeded(){
   if(!answered){
-    document.getElementById('lock-notice').classList.remove('show');
-    document.querySelectorAll('.opt-btn').forEach(b=>{ b.classList.remove('locked'); b.disabled=false; });
     timeoutQ();
   }
 }

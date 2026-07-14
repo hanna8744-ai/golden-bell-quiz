@@ -54,7 +54,7 @@
   <div class="info-grid" id="summary"></div>
   <div class="timer-display hidden" id="timer-display">30</div>
   <div class="question-box" id="question-box">게임을 시작할 준비가 되면 아래 버튼을 눌러주세요.</div>
-  <button class="btn-primary" id="advance-btn" onclick="handleAdvanceClick()">▶ 게임 시작 (1번 문제 공개)</button>
+  <button class="btn-primary" id="advance-btn" onclick="handleAdvanceClick()">▶ 게임 시작 (1번 문제 + 타이머 시작)</button>
   <a href="live.html" class="back-link">← 참가자(실시간 진행) 페이지로</a>
 </div>
 
@@ -151,11 +151,14 @@ let sessionNum = 1;
 let totalParticipants = 0;
 let controlGQ = -1;
 let controlUnsub = null;
+let lbUnsub = null;
+let eliminatedCount = 0;
 
 const globalMetaRef = ref(db, 'global_meta');
 const controlRef = () => ref(db, `sessions/session_${sessionNum}/control`);
+const lbRef = () => ref(db, `sessions/session_${sessionNum}/leaderboard`);
 
-let controlPhase = 'idle';   // idle | shown | active | reveal
+let controlPhase = 'idle';   // idle | active | reveal | finished
 let controlStartTime = null;
 let hostTickInterval = null;
 let hostRevealTimeout = null;
@@ -187,6 +190,7 @@ function startWatching(){
     if(newSessionNum !== sessionNum){
       sessionNum = newSessionNum;
       watchControl();
+      watchLeaderboard();
     } else {
       sessionNum = newSessionNum;
     }
@@ -196,6 +200,7 @@ function startWatching(){
     console.error('세션 정보 조회 오류:', err);
   });
   watchControl();
+  watchLeaderboard();
 }
 
 function watchControl(){
@@ -203,12 +208,28 @@ function watchControl(){
   controlUnsub = onValue(controlRef(), (snap)=>{
     const data = snap.exists() ? snap.val() : {globalQ:-1, phase:'idle', startTime:null};
     controlGQ = (data.globalQ===undefined || data.globalQ===null) ? -1 : data.globalQ;
-    controlPhase = data.phase || (controlGQ<0 ? 'idle' : 'shown');
+    controlPhase = data.phase || (controlGQ<0 ? 'idle' : 'active');
     controlStartTime = data.startTime || null;
     renderControl();
   }, (err)=>{
     console.error('진행 상태 조회 오류:', err);
     document.getElementById('question-box').textContent = '진행 상태를 불러올 수 없습니다. Firebase 규칙/네트워크를 확인하세요.';
+  });
+}
+
+// ── 리더보드 실시간 구독: 생존자/탈락자 수를 즉시 반영 ──
+function watchLeaderboard(){
+  if(lbUnsub){ lbUnsub(); lbUnsub=null; }
+  lbUnsub = onValue(lbRef(), (snap)=>{
+    if(snap.exists()){
+      const data = Object.values(snap.val()).filter(v=>v && v.name);
+      eliminatedCount = data.filter(e=>e.survived===0).length;
+    } else {
+      eliminatedCount = 0;
+    }
+    renderControl();
+  }, (err)=>{
+    console.error('리더보드 조회 오류:', err);
   });
 }
 
@@ -227,12 +248,14 @@ function renderControl(){
 
   summary.innerHTML = `
     <div class="info-card"><div class="num">${totalParticipants}</div><div class="label">참여자 수</div></div>
+    <div class="info-card"><div class="num">${Math.max(0, totalParticipants - eliminatedCount)}</div><div class="label">🔔 생존자</div></div>
+    <div class="info-card"><div class="num">${eliminatedCount}</div><div class="label">💀 탈락자</div></div>
     <div class="info-card"><div class="num">${controlGQ<0?'대기 중':(controlGQ>=50?'종료':(controlGQ+1)+' / 50')}</div><div class="label">진행 상황</div></div>
   `;
 
   if(controlGQ < 0){
-    box.innerHTML = `게임을 시작할 준비가 되면 아래 버튼을 눌러주세요.<br>버튼을 누르는 즉시 live.html에 접속한 모든 참가자의 화면에 1번 문제가 표시됩니다 (타이머는 아직 시작되지 않아요).`;
-    btn.textContent = '▶ 게임 시작 (1번 문제 공개)';
+    box.innerHTML = `게임을 시작할 준비가 되면 아래 버튼을 눌러주세요.<br>버튼을 누르는 즉시 live.html에 접속한 모든 참가자의 화면에 1번 문제가 표시되고 30초 타이머가 바로 시작됩니다.`;
+    btn.textContent = '▶ 게임 시작 (1번 문제 + 타이머 시작)';
     btn.disabled=false;
     return;
   }
@@ -247,16 +270,17 @@ function renderControl(){
   const s = STAGES[stageIdx], q = s.questions[qIdx];
   const answerText = s.type==='ox' ? (q.answer==='O'?'O (⭕)':'X (❌)') : `${'①②③④'[q.answer]} ${q.opts[q.answer]}`;
 
-  if(controlPhase === 'shown'){
+  if(controlPhase === 'reveal'){
     box.innerHTML = `
       <strong>${s.id}단계 ${qIdx+1}번 문제 (전체 ${controlGQ+1}/50)</strong><br><br>
-      ${q.q}
-      ${s.type==='mc' ? '<br><br>' + q.opts.map((o,i)=>`${'①②③④'[i]} ${o}`).join('<br>') : ''}
-      <br><br><em style="color:#94a3b8;">정답과 해설은 타이머가 끝나면 표시됩니다.</em>
+      ${q.q}<br><br>
+      ✅ 정답: <strong>${answerText}</strong><br>
+      💡 ${q.exp}<br>
+      <span class="page-ref">${q.page}</span>
     `;
-    btn.textContent = '⏱ 문제 풀기 시작 (30초 타이머)';
+    btn.textContent = controlGQ===49 ? '🏁 골든벨 종료 (결과 확정)' : `다음 퀴즈 → (${controlGQ+2}번 문제 + 타이머 시작)`;
     btn.disabled=false;
-  } else if(controlPhase === 'active'){
+  } else { // active (문제 공개 = 타이머 진행 중, 별도의 '보여주기 전용' 단계 없음)
     box.innerHTML = `
       <strong>${s.id}단계 ${qIdx+1}번 문제 (전체 ${controlGQ+1}/50)</strong><br><br>
       ${q.q}
@@ -267,16 +291,6 @@ function renderControl(){
     btn.disabled=true;
     timerDisp.classList.remove('hidden');
     runHostCountdown(q, s, stageIdx, qIdx);
-  } else { // reveal
-    box.innerHTML = `
-      <strong>${s.id}단계 ${qIdx+1}번 문제 (전체 ${controlGQ+1}/50)</strong><br><br>
-      ${q.q}<br><br>
-      ✅ 정답: <strong>${answerText}</strong><br>
-      💡 ${q.exp}<br>
-      <span class="page-ref">${q.page}</span>
-    `;
-    btn.textContent = controlGQ===49 ? '🏁 골든벨 종료 (결과 확정)' : `다음 퀴즈 → (${controlGQ+2}번 문제 공개)`;
-    btn.disabled=false;
   }
 }
 
@@ -310,15 +324,16 @@ window.handleAdvanceClick = async function(){
   btn.disabled = true;
   try{
     if(controlGQ < 0){
-      // 게임 시작 -> 1번 문제를 '보여주기만' 하는 상태로 공개
-      await set(controlRef(), {globalQ:0, phase:'shown', startTime:null, updatedAt:Date.now()});
-    } else if(controlPhase === 'shown'){
-      // 타이머 시작
-      await set(controlRef(), {globalQ:controlGQ, phase:'active', startTime:Date.now(), updatedAt:Date.now()});
+      // 게임 시작 -> 1번 문제 공개 + 타이머 즉시 시작
+      await set(controlRef(), {globalQ:0, phase:'active', startTime:Date.now(), updatedAt:Date.now()});
     } else if(controlPhase === 'reveal'){
-      // 다음 문제로 (또는 종료)
+      // 다음 문제로 (또는 종료) -> 공개와 동시에 타이머 시작
       const next = controlGQ + 1;
-      await set(controlRef(), {globalQ: next, phase: next>=50 ? 'finished' : 'shown', startTime:null, updatedAt:Date.now()});
+      if(next >= 50){
+        await set(controlRef(), {globalQ: next, phase:'finished', startTime:null, updatedAt:Date.now()});
+      } else {
+        await set(controlRef(), {globalQ: next, phase:'active', startTime:Date.now(), updatedAt:Date.now()});
+      }
     }
   }catch(e){
     console.error('진행 상태 저장 오류:', e);
