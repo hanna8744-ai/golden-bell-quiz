@@ -283,33 +283,23 @@ function updateSummary(data){
   document.getElementById('sum-avg').textContent=avg+'점';
 }
 
-// ── 이름 파싱 (학년 과 이름) ──
+// ── 이름 파싱 — grade/dept 필드 직접 사용, 없으면 name에서 파싱 ──
 const GRADES=['1학년','2학년','3학년'];
 const DEPTS=['시각디자인과','콘텐츠디자인과','게임그래픽디자인과','만화애니메이션과','패션스타일리스트과'];
 
-function parseName(fullName){
-  if(!fullName) return {grade:'-',dept:'-',name:'-'};
-  const str=fullName.trim();
-
-  // 학년 추출
-  let grade='';
-  for(const g of GRADES){
-    if(str.includes(g)){ grade=g; break; }
+function parseName(item){
+  // 신규: grade, dept 필드가 별도로 있는 경우
+  if(item.grade && item.dept){
+    return { grade:item.grade, dept:item.dept, name:item.name||'-' };
   }
-  // 과 추출
-  let dept='';
-  for(const d of DEPTS){
-    if(str.includes(d)){ dept=d; break; }
-  }
-  // 이름: 학년+과 제거 후 남은 것
-  let name=str.replace(grade,'').replace(dept,'').trim();
-  if(!name) name=str;
-
-  return {
-    grade: grade||'-',
-    dept:  dept||'-',
-    name:  name||str
-  };
+  // 구버전: name 필드에 "학년 과 이름" 형태로 저장된 경우
+  const str=(item.name||'').trim();
+  let grade='', dept='';
+  for(const g of GRADES){ if(str.includes(g)){grade=g;break;} }
+  for(const d of DEPTS){ if(str.includes(d)){dept=d;break;} }
+  if(!grade&&!dept) return {grade:'-', dept:'-', name:str};
+  const name=str.replace(grade,'').replace(dept,'').trim();
+  return {grade:grade||'-', dept:dept||'-', name:name||str};
 }
 
 // ── 테이블 렌더 ──
@@ -324,7 +314,7 @@ function renderTable(data){
     const rank=i+1;
     const rClass=rank===1?'rank-1':rank===2?'rank-2':rank===3?'rank-3':'rank-n';
     const rLabel=medals[i]||(rank+'위');
-    const p=parseName(item.name);
+    const p=parseName(item);
     const resultBadge=item.survived===1
       ?'<span class="survived-badge">🔔 골든벨</span>'
       :'<span class="elim-badge">💀 탈락</span>';
@@ -363,8 +353,8 @@ function applyFilter(){
   const dept=document.getElementById('filter-dept').value;
   const result=document.getElementById('filter-result').value;
   let filtered=allData;
-  if(grade) filtered=filtered.filter(d=>parseName(d.name).grade===grade);
-  if(dept)  filtered=filtered.filter(d=>parseName(d.name).dept===dept);
+  if(grade) filtered=filtered.filter(d=>parseName(d).grade===grade);
+  if(dept)  filtered=filtered.filter(d=>parseName(d).dept===dept);
   if(result!=='') filtered=filtered.filter(d=>String(d.survived)===result);
   renderTable(filtered);
   updateSummary(filtered);
@@ -387,7 +377,7 @@ document.getElementById('btn-excel').addEventListener('click',()=>{
 
   // 전체 시트 데이터
   const rows=allData.map((item,i)=>{
-    const p=parseName(item.name);
+    const p=parseName(item);
     return {
       '순위': i+1,
       '학년': p.grade||'-',
