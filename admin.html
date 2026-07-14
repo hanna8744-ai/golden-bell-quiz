@@ -275,15 +275,32 @@ function updateSummary(data){
 }
 
 // ── 이름 파싱 (학년 과 이름) ──
+const GRADES=['1학년','2학년','3학년'];
+const DEPTS=['시각디자인과','콘텐츠디자인과','게임그래픽디자인과','만화애니메이션과','패션스타일리스트과'];
+
 function parseName(fullName){
-  const parts = fullName.trim().split(' ');
-  // "1학년 시각디자인과 홍길동" 형태
-  if(parts.length>=3){
-    return { grade:parts[0], dept:parts[1], name:parts.slice(2).join(' ') };
-  } else if(parts.length===2){
-    return { grade:parts[0], dept:'', name:parts[1] };
+  if(!fullName) return {grade:'-',dept:'-',name:'-'};
+  const str=fullName.trim();
+
+  // 학년 추출
+  let grade='';
+  for(const g of GRADES){
+    if(str.includes(g)){ grade=g; break; }
   }
-  return { grade:'', dept:'', name:fullName };
+  // 과 추출
+  let dept='';
+  for(const d of DEPTS){
+    if(str.includes(d)){ dept=d; break; }
+  }
+  // 이름: 학년+과 제거 후 남은 것
+  let name=str.replace(grade,'').replace(dept,'').trim();
+  if(!name) name=str;
+
+  return {
+    grade: grade||'-',
+    dept:  dept||'-',
+    name:  name||str
+  };
 }
 
 // ── 테이블 렌더 ──
