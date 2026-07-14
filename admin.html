@@ -97,6 +97,7 @@
     <div class="right">
       <span id="top-session-label" style="font-size:0.82rem;opacity:0.8;"></span>
       <button class="btn-logout" id="btn-logout">로그아웃</button>
+      <div id="debug-box" style="display:none;margin-top:12px;background:#1e293b;color:#a3e635;border-radius:10px;padding:14px;font-size:0.8rem;font-family:monospace;line-height:1.8;white-space:pre-wrap;word-break:break-all;"></div>
     </div>
   </div>
 
@@ -108,6 +109,7 @@
       <select class="session-select" id="session-select"></select>
       <button class="btn-load" id="btn-load">📂 불러오기</button>
       <button class="btn-excel" id="btn-excel" disabled>⬇ 엑셀 다운로드</button>
+      <button id="btn-debug" style="padding:9px 16px;background:#f59e0b;border:none;border-radius:10px;color:white;font-size:0.85rem;font-weight:700;cursor:pointer;">🔍 name값 확인</button>
     </div>
 
     <!-- 요약 -->
@@ -252,6 +254,13 @@ async function loadData(){
       if(b.score!==a.score) return b.score-a.score;
       return b.qReached-a.qReached;
     });
+
+    // ★ Firebase 실제 저장값 확인용 (개발자 도구 Console에서 확인)
+    console.log('=== Firebase 저장 데이터 확인 ===');
+    allData.forEach((item,i)=>{
+      console.log(`[${i+1}위] name: "${item.name}" | score: ${item.score} | survived: ${item.survived}`);
+    });
+    console.log('================================');
     document.getElementById('top-session-label').textContent=`${selVal}회차 데이터`;
     updateSummary(allData);
     renderTable(allData);
@@ -334,7 +343,21 @@ function renderTable(data){
   }).join('');
 }
 
-// ── 필터 ──
+// ── 디버그 버튼 ──
+document.getElementById('btn-debug').addEventListener('click',()=>{
+  const box=document.getElementById('debug-box');
+  if(!allData.length){
+    box.style.display='block';
+    box.textContent='⚠️ 먼저 데이터를 불러오세요.';
+    return;
+  }
+  let txt='=== Firebase 저장된 name 값 ===\n';
+  allData.forEach((item,i)=>{
+    txt+=`[${i+1}] name: "${item.name}"\n`;
+  });
+  box.style.display='block';
+  box.textContent=txt;
+});
 function applyFilter(){
   const grade=document.getElementById('filter-grade').value;
   const dept=document.getElementById('filter-dept').value;
