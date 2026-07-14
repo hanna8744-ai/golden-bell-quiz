@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>골든벨 진행자 컨트롤</title>
+<style>
+  :root{--gold:#FFD700;--dark-gold:#B8860B;--navy:#1a2744;--blue:#2563eb;--green:#16a34a;--red:#dc2626;--gray:#64748b;--teal:#0f766e;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#1a2744 0%,#0f766e 100%);min-height:100vh;color:#222;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .card{background:rgba(255,255,255,0.97);border-radius:24px;padding:32px 30px;max-width:640px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+  h1{font-size:1.5rem;font-weight:900;color:var(--navy);margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+  .sub{color:var(--gray);font-size:0.85rem;margin-bottom:18px;}
+  .name-input{width:100%;padding:12px 15px;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;outline:none;margin-bottom:12px;}
+  .name-input:focus{border-color:var(--teal);}
+  .btn-primary{width:100%;padding:14px;background:linear-gradient(135deg,var(--teal),#0d5c56);border:none;border-radius:14px;font-size:1.02rem;font-weight:800;color:white;cursor:pointer;transition:transform 0.15s;}
+  .btn-primary:hover{transform:translateY(-2px);}
+  .btn-primary:disabled{opacity:0.45;cursor:not-allowed;transform:none;}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .info-card{background:#f0fdfa;border-radius:12px;padding:11px;text-align:center;}
+  .info-card .num{font-size:1.3rem;font-weight:900;color:var(--teal);}
+  .info-card .label{font-size:0.7rem;color:var(--gray);}
+  .question-box{background:#f8fafc;border:2px solid #e2e8f0;border-radius:14px;padding:16px 18px;margin-bottom:16px;font-size:0.92rem;line-height:1.7;color:#222;text-align:left;min-height:120px;}
+  .question-box strong{color:var(--navy);}
+  .page-ref{display:inline-block;margin-top:5px;background:#e0f2fe;color:#0369a1;border-radius:8px;padding:2px 9px;font-size:0.75rem;font-weight:700;}
+  .session-badge{display:inline-block;background:#e0f2fe;color:#0369a1;border-radius:20px;padding:4px 14px;font-size:0.75rem;font-weight:700;margin-bottom:14px;}
+  .error-msg{background:#fef2f2;border:2px solid #fca5a5;color:#991b1b;border-radius:10px;padding:10px 14px;font-size:0.83rem;margin-bottom:12px;display:none;}
+  .error-msg.show{display:block;}
+  .hidden{display:none !important;}
+  .back-link{display:inline-block;margin-top:14px;color:var(--gray);font-size:0.8rem;text-decoration:none;}
+  .back-link:hover{text-decoration:underline;}
+  .warn-box{background:#fff3cd;border:2px solid var(--gold);border-radius:10px;padding:10px 14px;font-size:0.78rem;color:#7a5700;margin-bottom:14px;line-height:1.6;}
+</style>
+</head>
+<body>
+
+<div class="card" id="login-view">
+  <h1>🎮 골든벨 진행자 컨트롤</h1>
+  <p class="sub">진행자 비밀번호를 입력하면 실시간 진행 제어 화면으로 이동합니다.<br>
+  이 페이지는 <strong>live.html</strong>(실시간 진행 버전)에 접속한 참가자 화면을 조작합니다.</p>
+  <div class="error-msg" id="login-error">❌ 비밀번호가 올바르지 않습니다.</div>
+  <input type="password" id="login-pw-input" class="name-input" placeholder="진행자 비밀번호 입력">
+  <button class="btn-primary" onclick="tryLogin()">✅ 입장</button>
+  <a href="live.html" class="back-link">← 참가자(실시간 진행) 페이지로</a>
+</div>
+
+<div class="card hidden" id="control-view">
+  <h1>🎮 골든벨 진행자 컨트롤</h1>
+  <div class="warn-box">⚠️ 이 페이지는 <strong>live.html</strong>에 접속한 참가자만 조작합니다. 기존 <strong>index.html</strong> 참가자는 영향받지 않습니다.</div>
+  <div class="session-badge" id="session-badge">게임 불러오는 중...</div>
+  <div class="info-grid" id="summary"></div>
+  <div class="question-box" id="question-box">게임을 시작할 준비가 되면 아래 버튼을 눌러주세요.</div>
+  <button class="btn-primary" id="advance-btn" onclick="advance()">▶ 게임 시작 (1번 문제 공개)</button>
+  <a href="live.html" class="back-link">← 참가자(실시간 진행) 페이지로</a>
+</div>
+
+<script>
+// ── 퀴즈 데이터 ──
+const STAGES=[
+  {id:1,title:'OX 퀴즈',desc:'맞으면 O, 틀리면 X를 선택하세요!',type:'ox',timeLimit:30,pointsPer:10,questions:[
+    {q:'저축은 처분 가능 소득에서 소비 지출을 제외하고 남은 금액이다.',answer:'O',exp:'저축은 미래 소비를 위해 현재 소비를 억제하는 것으로, 처분 가능 소득에서 소비 지출을 제외한 나머지 금액입니다.',page:'📖 교재③ p.55'},
+    {q:'일반적으로 금융 소득에 대해서는 세금이 부과되지 않는 것이 원칙이다.',answer:'X',exp:'일반적으로 금융 소득에도 세금(이자소득세 등)이 부과됩니다. 비과세 예금이나 세금 우대 저축은 예외적으로 세제 혜택이 주어지는 상품입니다.',page:'📖 교재③ p.56'},
+    {q:'예금자 보호 제도에 따라 금융회사가 파산하더라도 한 금융회사에서 1인당 원금과 이자를 포함해 1억 원까지 보장받을 수 있다.',answer:'O',exp:'2025년 9월 1일부터 예금자보호법 개정으로 보호 한도가 기존 5천만 원에서 1억 원(원금+이자 합산)으로 상향되었습니다.',page:'📖 교재③ p.58'},
+    {q:'은행에서 판매하는 펀드 상품도 예금자 보호 대상에 포함된다.',answer:'X',exp:'펀드는 운용 결과에 따라 이익이나 손실이 투자자에게 귀속되는 투자 상품으로, 예금자보호법상 보호 대상이 아닙니다.',page:'📖 교재③ p.58~59'},
+    {q:'신용 점수는 1~1,000점으로 표시하며, 점수가 높을수록 신용도가 높음을 의미한다.',answer:'O',exp:'2021년부터 전 금융권에 1,000점 만점의 신용 점수제가 도입되었으며, 점수가 높을수록 신용도가 높습니다.',page:'📖 교재④ p.87'},
+    {q:'일반적으로 신용이 좋을수록 은행에서 대출 가능한 금액이 커지고 대출 금리도 높아진다.',answer:'X',exp:'신용이 좋을수록 대출 가능 금액은 커지지만, 대출 금리는 낮아집니다. 신용도가 낮을수록 높은 금리가 적용됩니다.',page:'📖 교재④ p.87'},
+    {q:'카드 할부 수수료율은 할부 기간이 길어질수록 낮아진다.',answer:'X',exp:'카드 할부 수수료율은 할부 기간 구간별로 동일한 금리가 적용됩니다. 같은 구간 내 짧은 기간을 선택하는 것이 수수료 절약에 유리합니다.',page:'📖 교재④ p.85'},
+    {q:'보이스피싱 사기범은 해외에 본부를 두고 공공기관의 대표전화로 발신자 번호를 조작하여 무작위로 국내에 전화할 수 있다.',answer:'O',exp:'보이스피싱 조직은 주로 해외에 본부를 두고, 공공기관 등의 번호로 발신자 번호를 조작(스푸핑)하여 피해자에게 전화를 겁니다.',page:'📖 교재⑤ p.5'},
+    {q:'정부기관이나 금융회사는 전화나 문자로 개인정보(주민등록번호, 카드 비밀번호)를 요구하거나 돈을 보내라고 할 수 있다.',answer:'X',exp:'정부기관 및 제도권 금융회사는 절대로 전화나 문자로 개인정보를 묻거나 돈을 보내라고 요구하지 않습니다. 이런 연락은 100% 보이스피싱입니다.',page:'📖 교재⑤ p.29'},
+    {q:'포트폴리오를 구성하여 분산 투자를 하면 모든 종류의 투자 위험을 완전히 없앨 수 있다.',answer:'X',exp:'분산 투자는 개별 기업의 위험은 줄일 수 있지만, 경기 변동·인플레이션 등 시장 전체의 위험(시스템 위험)까지 모두 제거할 수는 없습니다.',page:'📖 교재③ p.73'},
+  ]},
+  {id:2,title:'2단계 – 저축과 투자',desc:'저축 상품, 예금자 보호, 투자 원칙에 관한 문제입니다.',type:'mc',timeLimit:30,pointsPer:10,questions:[
+    {q:'저축 상품을 선택할 때, 시중 금리가 내리는 추세라면 어떤 선택이 유리한가?',opts:['1년짜리 단기 정기 예금에 자주 갈아탄다','높은 이자율의 장기 정기 예금에 가입한다','수시 입출금이 가능한 보통 예금에 넣어둔다','금리와 관계없이 적금이 항상 유리하다'],answer:1,exp:'시중 금리가 내리는 추세라면 현재의 높은 이자율로 장기 정기 예금을 가입하는 것이 유리합니다.',page:'📖 교재③ p.55'},
+    {q:'예금자 보호 제도에서 보호받을 수 있는 한도로 옳은 것은?',opts:['한 금융회사에서 1인당 3천만 원','한 금융회사에서 1인당 5천만 원','한 금융회사에서 1인당 1억 원','금융회사 전체를 합산하여 1인당 1억 원'],answer:2,exp:'2025년 9월 1일부터 예금자보호법 개정으로 보호 한도가 기존 5천만 원에서 1억 원으로 상향되었습니다. 같은 금융회사 내 1인 기준으로 원금과 이자를 합산한 금액입니다.',page:'📖 교재③ p.58'},
+    {q:'투자 정보의 신뢰성을 파악할 때 검토해야 할 사항이 아닌 것은?',opts:['누가 만든 정보인가','언제 만들어진 정보인가','어떤 목적으로 만들어진 정보인가','정보를 전달한 사람이 나의 지인인가'],answer:3,exp:'투자 정보의 신뢰성은 ①제작 주체, ②최신성, ③목적으로 판단합니다. 지인을 통한 정보는 신뢰성의 근거가 되지 않습니다.',page:'📖 교재③ p.62'},
+    {q:'주식에 대한 설명으로 옳은 것은?',opts:['원금 손실이 없는 안전 상품이다','국가나 기업이 돈을 빌리며 발행하는 증서이다','어떤 회사에 자금을 투자한 사람에게 발행하는 소유 지분 증서이다','전문가가 투자를 대신해주는 간접 투자 상품이다'],answer:2,exp:'주식은 회사에 자금을 투자한 사람(주주)에게 소유 지분을 표시하는 증서입니다.',page:'📖 교재③ p.67'},
+    {q:"'100 빼기 나이'의 원칙에 따를 때, 40세인 사람이 투자 자산에 배분해야 하는 비율은?",opts:['40%','50%','60%','70%'],answer:2,exp:"'100 - 나이' 원칙은 100에서 자기 나이를 뺀 만큼을 공격적 투자 자산에 배분하는 것입니다. 40세라면 60%, 나머지 40%는 안전 자산에 배분합니다.",page:'📖 교재③ p.71'},
+    {q:'다음 중 예금자보호법상 보호 대상 금융상품이 아닌 것은?',opts:['보통 예금','정기 적금','외화 예금','주식·채권·펀드 등 금융투자 상품'],answer:3,exp:'주식, 채권, 펀드 등 금융투자 상품은 운용 결과에 따라 손익이 투자자에게 귀속되므로 예금자보호법상 보호 대상이 아닙니다.',page:'📖 교재③ p.58~59'},
+    {q:"분산 투자에서 '포트폴리오(portfolio)'의 의미로 가장 적절한 것은?",opts:['주식만으로 구성된 투자 목록','은행 예금과 적금만 묶은 저축 계획','원금 손실의 위험을 줄이기 위해 분산 투자하는 것 또는 분산 투자한 상품의 묶음','단기간에 높은 수익을 추구하는 집중 투자 전략'],answer:2,exp:"포트폴리오는 원래 '서류 가방', '작품집'이라는 뜻으로, 투자에서는 원금 손실 위험을 줄이기 위해 분산 투자하는 것 또는 분산 투자한 상품의 묶음을 의미합니다.",page:'📖 교재③ p.69'},
+    {q:"금융투자의 사전적 보호 제도에서 '적합성의 원칙'에 대한 설명으로 옳은 것은?",opts:['금융 상품을 홍보할 때 허위·과장 광고를 금지하는 원칙','금융투자업자가 소비자의 연령, 재산, 투자 목적 등에 비추어 부적합한 상품 계약을 권유해서는 안 된다는 원칙','소비자가 금융 상품에 계약하기 전에 해당 상품이 적정한지 미리 질문하는 원칙','금융 상품의 내용과 다르게 알리거나 중요한 사항을 알리지 않는 행위를 금지하는 원칙'],answer:1,exp:'적합성의 원칙은 금융투자업자가 소비자의 연령, 재산 상황, 거래 목적, 투자 경험 등에 비추어 부적합한 금융 상품의 계약 체결을 권유해서는 안 된다는 원칙입니다.',page:'📖 교재③ p.75'},
+    {q:'정기 예금과 정기 적금의 차이로 옳은 것은?',opts:['정기 예금은 목돈 마련, 정기 적금은 목돈 운용을 목적으로 한다','정기 예금은 목돈을 맡겨 운용하고, 정기 적금은 매달 납입하여 목돈을 마련하는 상품이다','정기 예금은 원금 손실이 가능하고, 정기 적금은 원금이 보장된다','정기 예금과 정기 적금은 이자 계산 방식이 동일하다'],answer:1,exp:'정기 예금은 목돈을 일정 기간 맡겨 이자를 받는 목돈 운용 상품이고, 정기 적금은 매달 일정 금액을 납입하여 만기에 목돈을 마련하는 상품입니다.',page:'📖 교재③ p.67'},
+    {q:'투자 손실이 발생했을 때, 금융투자 회사의 불완전 판매로 인한 피해를 사후적으로 구제받는 방법이 아닌 것은?',opts:['당사자 간의 합의','금융감독원을 통한 분쟁 조정','법원을 통한 소송','금융투자업자에게 투자 책임 전가 요청'],answer:3,exp:'최종 투자 결정의 책임은 투자자 본인에게 있으므로 단순히 투자 책임을 금융투자업자에게 전가할 수는 없습니다.',page:'📖 교재③ p.75'},
+  ]},
+  {id:3,title:'3단계 – 신용과 부채 관리',desc:'신용 거래, 신용 점수, 부채 상환에 관한 문제입니다.',type:'mc',timeLimit:30,pointsPer:10,questions:[
+    {q:"금융 거래에서 '신용'의 의미로 가장 적절한 것은?",opts:['현재 보유한 현금의 총액','금융회사에 예치한 예금의 총액','장래의 어느 시점에 갚을 것을 약속하고 돈을 빌릴 수 있는 능력','신용카드 사용 한도 금액'],answer:2,exp:'금융 거래에서 신용이란 장래의 어느 시점에 갚을 것을 약속하고 돈을 빌릴 수 있는 능력을 뜻합니다.',page:'📖 교재④ p.81'},
+    {q:'신용카드 이용에 따른 신용 비용에 해당하지 않는 것은?',opts:['연회비','할부 수수료','단기 카드 대출(현금 서비스) 수수료','신용카드 포인트 적립금'],answer:3,exp:'신용카드 이용에 따른 신용 비용으로는 연회비, 할부 수수료, 단기 카드 대출 수수료, 장기 카드 대출(카드론) 이자 등이 있습니다. 포인트 적립금은 혜택입니다.',page:'📖 교재④ p.85'},
+    {q:'신용 점수 관리 방법으로 옳지 않은 것은?',opts:['대출금을 연체하지 않고 성실히 갚는다','휴대폰 요금 등 공과금을 연체하지 않는다','신용 점수를 높이려면 대출을 최대한 많이 받아야 한다','주거래 은행을 꾸준히 이용한다'],answer:2,exp:'과도한 대출은 오히려 신용 점수를 낮출 수 있습니다. 적절한 규모의 대출을 받아 성실히 상환하는 것이 중요합니다.',page:'📖 교재④ p.89'},
+    {q:'30만 원이 넘는 금액을 며칠 이상 연체하면 신용 점수에 치명적인 영향을 주는가?',opts:['7일','15일','30일','60일'],answer:2,exp:'30만 원이 넘는 금액을 30일 이상 연체하면 신용 점수에 치명적입니다. 연체는 최장 3년간 신용 평가에 반영됩니다.',page:'📖 교재④ p.89'},
+    {q:"부채 상환 방법 중 '원리금 균등 분할 상환'에 대한 설명으로 옳은 것은?",opts:['대출 기간 동안 이자만 납입하다가 원금은 만기에 한꺼번에 갚는 방식','원금을 대출 기간으로 나누어 매월 일정한 금액의 원금만 상환하는 방식','대출 기간 중 매월 원금 일부와 이자를 합하여 동일한 금액을 상환하는 방식','상환 금액을 자유롭게 선택하는 방식'],answer:2,exp:'원리금 균등 분할 상환은 매월 원금 일부와 이자를 합하여 동일한 금액을 상환하는 방식으로, 매월 상환액이 같아 자금 수급 계획을 세우기 쉽습니다.',page:'📖 교재④ p.94'},
+    {q:'대출 금리 적용 방식에 대한 설명으로 옳은 것은?',opts:['고정 금리는 시장 금리 변동에 따라 적용 금리가 변한다','변동 금리는 대출 기간 동안 금리가 변하지 않는다','향후 금리가 상승할 것으로 예상되면 변동 금리 대출이 유리하다','향후 금리가 상승할 것으로 예상되면 고정 금리 대출이 유리하다'],answer:3,exp:'금리가 상승할 것으로 예상된다면 현재 낮은 금리를 고정시키는 고정 금리 대출이 유리합니다.',page:'📖 교재④ p.93~94'},
+    {q:'신용 회복 지원 제도에서 법원이 담당하는 것은?',opts:['프리 워크아웃','개인 워크아웃','연체 전 채무 조정','개인 회생·개인 파산'],answer:3,exp:'우리나라의 채무 조정 제도는 신용회복위원회(프리 워크아웃·개인 워크아웃)와 법원(개인 회생·개인 파산)으로 나뉩니다.',page:'📖 교재④ p.97'},
+    {q:'신용 거래의 예시로 옳지 않은 것은?',opts:['신용카드로 물건 구매','은행 대출','휴대폰 요금 후불제','현금으로 즉시 물건 구매'],answer:3,exp:'신용 거래란 현재 돈이 없어도 필요한 물건을 사거나 서비스를 이용하고 나중에 대금을 갚는 방식입니다. 현금으로 즉시 구매하는 것은 현금 거래입니다.',page:'📖 교재④ p.81'},
+    {q:'신용 점수 산정 기준으로 가장 기본적인 평가 요소는?',opts:['직업과 소득 수준','보유 자산 규모','돈을 갚을 의사와 돈을 갚을 능력','거주 지역과 학력'],answer:2,exp:"신용 점수는 기본적으로 '돈을 갚을 의사가 있는지'와 '빌린 돈을 갚을 능력이 있는지'를 중점 평가합니다.",page:'📖 교재④ p.89'},
+    {q:'프리 워크아웃(연체 전 채무 조정)에 대한 설명으로 옳은 것은?',opts:['연체가 3개월 이상인 장기 채무자를 대상으로 한다','1~3개월 미만의 단기 연체 중인 개인 채무자를 대상으로 하는 채무 조정 제도이다','법원에서 운영하는 공적 채무 조정 제도이다','원금을 전액 탕감해주는 제도이다'],answer:1,exp:'프리 워크아웃은 신용회복위원회에서 운영하는 사적 채무 조정 제도로, 1~3개월 미만의 단기 연체 중인 개인 채무자를 대상으로 합니다.',page:'📖 교재④ p.97'},
+  ]},
+  {id:4,title:'4단계 – 보이스피싱 유형과 사례',desc:'보이스피싱의 다양한 수법과 파생 범죄에 관한 문제입니다.',type:'mc',timeLimit:30,pointsPer:10,questions:[
+    {q:'보이스피싱의 어원으로 올바르게 연결된 것은?',opts:['음성(voice) + 개인정보(private data) + 낚시(fishing)','영상(video) + 개인정보(private data) + 사기(fraud)','음성(voice) + 피해(pain) + 사기(scam)','전화(phone) + 개인정보(private data) + 낚시(fishing)'],answer:0,exp:'보이스피싱은 음성(voice) + 개인정보(private data) + 낚시(fishing)의 합성어로, 전화를 통해 개인정보·금융 정보를 빼내거나 재산을 편취하는 범죄입니다.',page:'📖 교재⑤ p.4'},
+    {q:'보이스피싱 사기 과정의 순서로 옳은 것은?',opts:['무작위 전화 → 사기계좌 확보 → 피해자 기망 → 해외 송금','사기 계좌 확보 → 무작위 전화·문자 → 공공기관 사칭·기망 → 이체 유도 → 해외 송금','공공기관 사칭 → 계좌 확보 → 무작위 전화 → 이체 유도','피해자 기망 → 계좌 확보 → 해외 송금 → 무작위 전화'],answer:1,exp:'보이스피싱 과정은 ①대포통장 확보 → ②무작위 전화·문자 → ③공공기관 사칭·기망 → ④이체 유도 → ⑤해외 송금 순서로 이루어집니다.',page:'📖 교재⑤ p.5'},
+    {q:"보이스피싱의 '셀프감금' 수법에 대한 설명으로 옳은 것은?",opts:['피해자의 SNS 계정을 해킹하여 지인에게 돈을 요구하는 수법','피해자의 집에 직접 찾아가 현금을 수거하는 수법','검찰·경찰 등을 사칭하여 범죄 연루를 명목으로 피해자를 숙박업소 등에 고립시킨 뒤 거액을 갈취하는 수법','피해자의 휴대폰을 빼앗아 금융 앱에 직접 접속하는 수법'],answer:2,exp:'셀프감금 수법은 검찰·경찰 등을 사칭하여 피해자를 숙박업소 등에 투숙하게 하여 고립시킨 뒤, 금융 자산은 물론 대출까지 종용하여 거액을 뜯어내는 신종 수법입니다.',page:'📖 교재⑤ p.13~15'},
+    {q:'대출빙자형 보이스피싱의 전형적인 수법이 아닌 것은?',opts:['"신용점수를 올리려면 예치금이 필요하다"며 선입금을 요구','"기존 대출을 먼저 갚아야 저금리 대출이 가능하다"며 이체 유도','"정부 지원 대출 대상자로 선정되었다"며 접근','구속영장이 발부되었다며 결백 증명을 위한 공탁금을 요구'],answer:3,exp:'구속영장·공탁금을 이용한 수법은 기관사칭형 보이스피싱입니다. 대출빙자형은 저금리 대출 등을 미끼로 선입금을 요구하는 것이 특징입니다.',page:'📖 교재⑤ p.6, 18~20'},
+    {q:"보이스피싱 파생 범죄 중 '셋팅폰'에 대한 설명으로 옳은 것은?",opts:['보이스피싱 조직이 개발한 악성 앱의 이름','명의자가 대여료를 받고 보이스피싱 조직에 빌려준 휴대폰','보이스피싱 피해자를 찾기 위한 전용 기기','발신자 번호를 조작하는 장비'],answer:1,exp:'셋팅폰은 명의자가 대여료를 받고 보이스피싱 조직에 빌려준 휴대폰입니다. 셋팅폰에는 금융기관·가상자산 거래소 앱이 설치되어 피해금을 빼돌리는 데 사용됩니다.',page:'📖 교재⑤ p.25'},
+    {q:'보이스피싱 피해 발생 시 내 계좌를 한 번에 지급정지하려면 어떤 서비스를 이용해야 하는가?',opts:['금융소비자 포털 파인(fine.fss.or.kr)의 금융상품 비교 서비스','계좌통합관리서비스(payinfo.or.kr)의 내 계좌 일괄 지급정지 서비스','명의도용방지서비스(msafer.or.kr)의 가입제한 서비스','한국인터넷진흥원(☎118)의 스미싱 신고 서비스'],answer:1,exp:'보이스피싱 피해 발생 시 계좌통합관리서비스(payinfo.or.kr) 또는 금융소비자 포털 파인(fine.fss.or.kr)을 통해 본인 명의 계좌를 일괄 또는 선택하여 즉시 지급정지 신청할 수 있습니다.',page:'📖 교재⑤ p.33'},
+    {q:'AI 음성변조를 이용한 보이스피싱에 대한 설명으로 옳지 않은 것은?',opts:['딥보이스 등 AI를 이용해 가족·지인의 목소리를 모방한다','실제 음성의 특성을 완벽하게 복제하기 때문에 의심 없이 속기 쉽다','영상통화로 요청이 와도 그대로 믿지 않는 것이 안전하다','AI 음성변조는 전화로만 이루어지며, 영상통화로는 구현이 불가능하다'],answer:3,exp:'AI 기술의 발전으로 음성은 물론 영상까지 조작하는 딥페이크 범죄도 증가하고 있습니다. 영상통화로 돈을 요청해도 그대로 믿지 말고 다른 방법으로 반드시 확인해야 합니다.',page:'📖 교재⑤ p.23'},
+    {q:'해외 취업 사기형 보이스피싱의 특징으로 옳은 것은?',opts:['주로 국내에서 단순 아르바이트로 위장한다','피해자에게 소액의 수수료만 요구한다','고연봉을 미끼로 해외 취업을 유인한 후, 보이스피싱 콜센터 역할을 강제로 수행하게 한다','피해자가 원하면 언제든지 자유롭게 귀국할 수 있다'],answer:2,exp:'해외 취업 사기는 높은 연봉을 미끼로 해외 취업을 유인한 뒤, 여권 압수 및 감금·협박하여 보이스피싱 콜센터의 역할을 강제로 수행하게 만드는 매우 심각한 유형입니다.',page:'📖 교재⑤ p.26, 28'},
+    {q:'보이스피싱 대출빙자형의 핵심 특징으로 옳은 것은?',opts:['납치·사고를 가장하여 급하게 돈을 요구한다','수사기관을 사칭하여 범죄 연루를 주장한다','저금리 대출·정부 지원 대출을 미끼로 접근하여 선입금을 요구한다','출처 불명의 링크를 클릭하게 하여 악성 앱을 설치시킨다'],answer:2,exp:'대출빙자형은 저금리 대출·정부 지원 대출 등을 미끼로 급전이 필요한 사람을 유인하고, 다양한 명목으로 선입금을 요구하는 것이 핵심 특징입니다.',page:'📖 교재⑤ p.18'},
+    {q:'통장묶기(통장 협박)에 대한 설명으로 옳은 것은?',opts:['피해자의 통장 비밀번호를 알아내어 직접 인출하는 수법','보이스피싱 피해자를 보호하기 위한 계좌 지급정지 제도를 악용하여, 피해자의 계좌를 지급정지 시킨 뒤 해제해준다며 돈을 갈취하는 수법','피해자를 협박하여 새 통장을 개설하게 만드는 수법','피해자 명의로 대포통장을 만들어 범죄에 이용하는 수법'],answer:1,exp:'통장묶기는 계좌 지급정지 제도를 악용하여, 피해자의 계좌에 소액을 입금한 뒤 허위 신고로 지급정지 시키고, 지급정지를 풀어주겠다며 돈을 요구하는 수법입니다.',page:'📖 교재⑤ p.25, 27'},
+  ]},
+  {id:5,title:'5단계 – 종합 심화',desc:'금융 종합 심화 문제입니다. 집중하세요!',type:'mc',timeLimit:30,pointsPer:10,questions:[
+    {q:'보이스피싱 피해 발생 시 신고 기관과 전화번호가 잘못 연결된 것은?',opts:['경찰청(지급정지 신고) — ☎ 112','금융감독원(피해상담 및 환급) — ☎ 1332','한국인터넷진흥원(해킹·피싱·스미싱 신고) — ☎ 118','전기통신금융사기 통합신고대응센터 — ☎ 112'],answer:3,exp:'전기통신금융사기 통합신고대응센터의 번호는 ☎1566-1188입니다. ☎112는 경찰청(보이스피싱 지급정지 신고)의 번호입니다.',page:'📖 교재⑤ p.32'},
+    {q:'개인정보가 유출되었을 때 신규 계좌 개설 및 신용카드 발급 등을 제한하기 위해 등록하는 시스템은?',opts:['계좌통합관리서비스(payinfo.or.kr)','명의도용방지서비스(msafer.or.kr)','금융감독원 개인정보노출자 사고예방시스템(pd.fss.or.kr)','금융소비자 포털 파인(fine.fss.or.kr)'],answer:2,exp:'개인정보가 노출된 경우 금융감독원 개인정보노출자 사고예방시스템(pd.fss.or.kr)에 등록하면, 금융회사들이 해당 정보를 공유하여 신규 계좌 개설 및 카드 발급 등을 제한합니다.',page:'📖 교재⑤ p.34'},
+    {q:"보이스피싱 예방을 위한 '여신거래 안심차단' 서비스의 기능으로 옳은 것은?",opts:['내가 지정한 기기에서만 인터넷뱅킹 이체를 허용하는 서비스','이체 시 일정 시간 경과 후 입금되어 취소 기회를 주는 서비스','신용대출, 카드론, 신용카드 발급 등 모든 신규 대출을 사전에 차단하는 서비스','본인 명의로 개통된 휴대폰을 조회하고 차단하는 서비스'],answer:2,exp:'여신거래 안심차단 서비스는 신용대출, 카드론, 신용카드 발급 등 모든 신규 대출을 사전에 차단하여 본인도 모르는 사이 실행된 대출 피해를 예방하는 서비스입니다.',page:'📖 교재⑤ p.29~30'},
+    {q:'투자 정보를 신뢰할 수 없는 경우로 가장 적절한 것은?',opts:['정부 발표 보고서에 담긴 정보','금융감독원 전자공시시스템(DART)의 정보','증권사 분석 자료에 담긴 정보','투자 상품 홍보를 목적으로 만들어진 인터넷 카페의 정보'],answer:3,exp:'투자 상품을 홍보하기 위한 상업적 목적 또는 투기를 목적으로 만들어진 정보는 신뢰성이 떨어질 가능성이 높습니다.',page:'📖 교재③ p.62'},
+    {q:'납치·사고빙자형 보이스피싱에 대한 올바른 대처 방법은?',opts:['사기범이 알려준 번호로 즉시 전화하여 사실 여부를 확인한다','당황하지 말고 요구하는 금액의 절반만 송금한다','즉시 해당 가족·지인에게 직접 전화하거나, 다른 방법으로 안전 여부를 먼저 확인한다','경찰에 신고하기 전에 먼저 송금하고 나중에 돌려받는다'],answer:2,exp:'납치·사고빙자형 보이스피싱을 당했을 때는 즉시 해당 가족이나 지인에게 직접 전화하거나 다른 경로로 안전 여부를 먼저 확인해야 합니다.',page:'📖 교재⑤ p.19~22'},
+    {q:'계좌가 보이스피싱으로 인해 지급정지 되었을 때, 올바른 대처 방법은?',opts:['사기범이 요구하는 대로 돈을 송금하고 지급정지 해제를 요청한다','아무 조치 없이 2개월이 지나면 자동으로 해제된다','사기범의 요구에 응하지 말고 은행에 이의신청을 통해 지급정지 해제를 요청한다','계좌를 영구 폐쇄하는 것이 유일한 방법이다'],answer:2,exp:'통신사기피해환급법 제7조에 따라 지급정지일로부터 2개월 이내에 은행에 이의를 제기하고 객관적 자료로 소명하면 지급정지를 해제할 수 있습니다.',page:'📖 교재⑤ p.27'},
+    {q:"보이스피싱 예방 서비스 중 '지연이체 서비스'에 대한 설명으로 옳은 것은?",opts:['해외 송금만 지연시키는 서비스','내가 지정한 계좌로만 이체가 가능하게 하는 서비스','이체 시 일정 시간 경과 후 입금되는 서비스로, 보이스피싱에 속아 실행한 이체를 일정 시간 내 취소할 수 있는 서비스','월 이체 한도를 제한하는 서비스'],answer:2,exp:'지연이체 서비스는 이체 시 일정 시간이 경과한 후에 입금되는 서비스로, 보이스피싱에 속아 송금한 경우 일정 시간 내에 이체를 취소할 수 있어 피해를 예방하는 데 도움이 됩니다.',page:'📖 교재⑤ p.30'},
+    {q:'다음 중 보이스피싱 피해를 예방하는 올바른 행동이 아닌 것은?',opts:['신청하지 않은 카드 배송 연락을 받으면 카드사 공식 번호로 직접 확인한다','출처가 불분명한 URL 링크는 클릭하지 않는다','M-safer의 휴대폰 가입제한서비스를 이용하여 명의 도용을 방지한다','대출 승인 전에 보증보험료나 예치금 요구가 오면 즉시 입금한다'],answer:3,exp:'금융사는 신용점수 상향이나 대출 승인을 위한 보증보험료·예치금을 절대 선입금으로 요구하지 않습니다. 이런 요구는 100% 보이스피싱 사기입니다.',page:'📖 교재⑤ p.29'},
+    {q:'투자자 보호를 위한 사전적 보호 제도에 해당하지 않는 것은?',opts:['적합성의 원칙','적정성의 원칙','금융투자업자의 설명 의무','금융감독원을 통한 분쟁 조정'],answer:3,exp:'금융감독원을 통한 분쟁 조정은 피해 발생 후 구제받는 사후적 보호 제도입니다. 사전적 보호 제도에는 적합성의 원칙, 적정성의 원칙, 설명 의무 등이 있습니다.',page:'📖 교재③ p.75'},
+    {q:'다음 중 신용 점수에 긍정적인 영향을 미치는 행동으로 옳은 것은?',opts:['대부업체에서 여러 건의 소액 대출을 받는다','신용카드 대금을 한 달씩 미뤄서 낸다','휴대폰 요금을 매달 연체한다','주거래 은행을 꾸준히 이용하고 통신 요금 등 공과금을 성실히 납부한다'],answer:3,exp:'신용 점수 관리를 위해서는 주거래 은행을 꾸준히 이용하고, 휴대폰 요금을 비롯한 각종 공과금을 연체하지 않도록 성실히 납부해야 합니다.',page:'📖 교재④ p.89'},
+  ]}
+];
+
+// ── 원본 문제 순서 보존 (셀 복원용) ──
+const ORIGINAL_STAGES = JSON.parse(JSON.stringify(STAGES));
+
+</script>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBT8yXBaLulPjQGgv_wiDyRhcM4LC1CgE8",
+  authDomain: "golden-bell-quiz.firebaseapp.com",
+  databaseURL: "https://golden-bell-quiz-default-rtdb.firebaseio.com",
+  projectId: "golden-bell-quiz",
+  storageBucket: "golden-bell-quiz.firebasestorage.app",
+  messagingSenderId: "544242063266",
+  appId: "1:544242063266:web:bbb221a1660f088d1ac4fb"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const ADMIN_PASSWORD = 'welcome';
+
+let sessionNum = 1;
+let totalParticipants = 0;
+let controlGQ = -1;
+let controlUnsub = null;
+
+const globalMetaRef = ref(db, 'global_meta');
+const controlRef = () => ref(db, `sessions/session_${sessionNum}/control`);
+
+function tryLogin(){
+  const pw = document.getElementById('login-pw-input').value;
+  const errBox = document.getElementById('login-error');
+  if(pw !== ADMIN_PASSWORD){
+    errBox.classList.add('show');
+    document.getElementById('login-pw-input').value='';
+    document.getElementById('login-pw-input').focus();
+    return;
+  }
+  errBox.classList.remove('show');
+  document.getElementById('login-view').classList.add('hidden');
+  document.getElementById('control-view').classList.remove('hidden');
+  startWatching();
+}
+
+document.getElementById('login-pw-input').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter') tryLogin();
+});
+
+function startWatching(){
+  onValue(globalMetaRef, (snap)=>{
+    const data = snap.exists() ? snap.val() : {sessionNum:1, totalParticipants:0};
+    const newSessionNum = data.sessionNum || 1;
+    totalParticipants = data.totalParticipants || 0;
+    if(newSessionNum !== sessionNum){
+      sessionNum = newSessionNum;
+      watchControl();
+    } else {
+      sessionNum = newSessionNum;
+    }
+    document.getElementById('session-badge').textContent = `게임 ${sessionNum}회차 진행 제어 (live.html 대상)`;
+    renderControl();
+  }, (err)=>{
+    console.error('세션 정보 조회 오류:', err);
+  });
+  watchControl();
+}
+
+function watchControl(){
+  if(controlUnsub){ controlUnsub(); controlUnsub=null; }
+  controlUnsub = onValue(controlRef(), (snap)=>{
+    const data = snap.exists() ? snap.val() : {globalQ:-1};
+    controlGQ = (data.globalQ===undefined || data.globalQ===null) ? -1 : data.globalQ;
+    renderControl();
+  }, (err)=>{
+    console.error('진행 상태 조회 오류:', err);
+    document.getElementById('question-box').textContent = '진행 상태를 불러올 수 없습니다. Firebase 규칙/네트워크를 확인하세요.';
+  });
+}
+
+function renderControl(){
+  const box = document.getElementById('question-box');
+  const btn = document.getElementById('advance-btn');
+  const summary = document.getElementById('summary');
+  summary.innerHTML = `
+    <div class="info-card"><div class="num">${totalParticipants}</div><div class="label">참여자 수</div></div>
+    <div class="info-card"><div class="num">${controlGQ<0?'대기 중':(controlGQ>=50?'종료':(controlGQ+1)+' / 50')}</div><div class="label">진행 상황</div></div>
+  `;
+  if(controlGQ < 0){
+    box.innerHTML = `게임을 시작할 준비가 되면 아래 버튼을 눌러주세요.<br>버튼을 누르는 즉시 live.html에 접속한 모든 참가자의 화면이 1번 문제로 전환됩니다.`;
+    btn.textContent = '▶ 게임 시작 (1번 문제 공개)';
+    btn.disabled=false;
+  } else if(controlGQ < 50){
+    const stageIdx = Math.floor(controlGQ/10), qIdx = controlGQ%10;
+    const s = STAGES[stageIdx], q = s.questions[qIdx];
+    const answerText = s.type==='ox' ? (q.answer==='O'?'O (⭕)':'X (❌)') : `${'①②③④'[q.answer]} ${q.opts[q.answer]}`;
+    box.innerHTML = `
+      <strong>${s.id}단계 ${qIdx+1}번 문제 (전체 ${controlGQ+1}/50)</strong><br><br>
+      ${q.q}<br><br>
+      ✅ 정답: <strong>${answerText}</strong><br>
+      💡 ${q.exp}<br>
+      <span class="page-ref">${q.page}</span>
+    `;
+    btn.textContent = controlGQ===49 ? '🏁 골든벨 종료 (결과 확정)' : `다음 퀴즈 → (${controlGQ+2}번 문제 공개)`;
+    btn.disabled=false;
+  } else {
+    box.innerHTML = `🏁 모든 문제가 종료되었습니다. 아직 생존한 참가자는 골든벨을 달성한 것으로 처리됩니다.`;
+    btn.textContent = '✅ 진행 완료';
+    btn.disabled=true;
+  }
+}
+
+window.advance = async function(){
+  const next = controlGQ < 0 ? 0 : controlGQ + 1;
+  const btn = document.getElementById('advance-btn');
+  btn.disabled = true;
+  try{
+    await set(controlRef(), {globalQ: next, updatedAt: Date.now()});
+  }catch(e){
+    console.error('진행 상태 저장 오류:', e);
+    alert('진행 상태 저장에 실패했습니다. 네트워크 또는 Firebase 규칙을 확인해주세요.');
+  }
+  renderControl();
+};
+window.tryLogin = tryLogin;
+</script>
+</body>
+</html>

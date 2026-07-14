@@ -92,6 +92,9 @@
   .btn-next-q{margin-top:12px;width:100%;padding:12px;background:var(--navy);border:none;border-radius:12px;color:white;font-size:0.94rem;font-weight:700;cursor:pointer;display:none;transition:background 0.2s;}
   .btn-next-q.show{display:block;}
   .btn-next-q:hover{background:var(--blue);}
+  .btn-next-q.status{cursor:default;background:#94a3b8 !important;}
+  .waiting-pulse{animation:pulse 1.6s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
   #elim-screen{text-align:center;}
   .elim-card{background:rgba(255,255,255,0.97);border-radius:24px;padding:38px 32px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
   .elim-icon{font-size:68px;display:block;margin-bottom:10px;}
@@ -169,13 +172,14 @@
 <div id="title-screen" class="screen active">
   <div class="title-box">
     <div class="new-game-wrap">
-      <a href="host.html" target="_blank" class="btn-admin" style="background:#0f766e;text-decoration:none;">📖 진행자 답안 열람</a>
+      <a href="host.html" target="_blank" class="btn-admin" style="background:#0f766e;text-decoration:none;">🎮 진행 제어 (진행자용)</a>
       <button class="btn-admin" onclick="showAdminLogin()">🛠 관리자</button>
       <button class="btn-new-game" onclick="showNewGameConfirm()">🔄 새 게임</button>
     </div>
     <span class="bell-icon">🔔</span>
     <h1>금융교육 골든벨</h1>
     <p class="subtitle">저축과 투자 · 신용과 부채 관리 · 보이스피싱 예방</p>
+    <div class="game-session-badge" style="background:#ccfbf1;color:#0f766e;">🎮 진행자 실시간 진행 버전</div>
     <div class="game-session-badge" id="session-badge">게임 불러오는 중...</div>
     <div class="new-game-confirm" id="new-game-confirm">
       ⚠️ <strong>새 게임을 시작하면 현재 순위 기록이 모두 삭제됩니다.</strong><br>
@@ -240,7 +244,17 @@
       <div class="meta-chip" id="intro-type">O / X</div>
       <div class="survival-chip">⚠ 오답 즉시 탈락</div>
     </div>
-    <button class="btn-next-stage" onclick="startStage()">▶ 시작하기</button>
+    <div class="waiting-pulse" style="color:var(--gray);font-size:0.86rem;font-weight:700;">곧 첫 문제가 시작됩니다...</div>
+  </div>
+</div>
+
+<!-- WAITING FOR HOST -->
+<div id="waiting-screen" class="screen">
+  <div class="stage-card">
+    <span class="bell-icon">⏳</span>
+    <div class="stage-title">진행자를 기다리는 중...</div>
+    <div class="stage-desc">진행자가 문제를 시작하면 화면이 자동으로 전환됩니다.</div>
+    <div class="survivor-info" id="waiting-survivor-info" style="margin-top:14px;">생존 현황 불러오는 중...</div>
   </div>
 </div>
 
@@ -264,7 +278,7 @@
     <div class="question-text" id="question-text"></div>
     <div class="options-grid" id="options-grid"></div>
     <div class="feedback-box" id="feedback-box"></div>
-    <button class="btn-next-q" id="btn-next-q">다음 문제 →</button>
+    <button class="btn-next-q" id="btn-next-q"></button>
   </div>
 </div>
 
@@ -361,7 +375,7 @@
 (function(){
   const FALLBACK_MSG = '⚠️ 앱 로딩에 실패했습니다.\n\n원인일 가능성이 높은 것들:\n· 이 파일을 더블클릭(file://)으로 직접 열었을 수 있습니다 → 웹서버(GitHub Pages 등)로 열어주세요.\n· 인터넷 연결이 끊겼거나 광고 차단 확장 프로그램이 Firebase 스크립트를 막았을 수 있습니다.\n\nF12 콘솔에서 빨간색 에러 메시지를 확인해주세요.';
   const names = ['showNewGameConfirm','cancelNewGame','confirmNewGame','selectGrade','selectDept',
-    'startGame','startStage','nextQuestion','showLeaderboard','goBackFromLB','showTitleScreen','renderLB',
+    'startGame','showLeaderboard','goBackFromLB','showTitleScreen','renderLB',
     'showAdminLogin','cancelAdminLogin','confirmAdminLogin','loadAdminSession','renderAdminLB',
     'closeAdminScreen','showScreen'];
   names.forEach(n=>{ window[n] = function(){ alert(FALLBACK_MSG); }; });
@@ -463,12 +477,16 @@ let leaderboard=[];
 let sessionNum=1;
 let totalParticipants=0;
 let selectedGrade='', selectedDept='';
+let playerState='idle'; // idle | alive | eliminated | cleared
+let lastRenderedGQ=-2;
+let controlUnsub=null;
 
 // ── Firebase DB 경로 ──
 const dbRef = () => ref(db, `sessions/session_${sessionNum}`);
 const metaRef = () => ref(db, `sessions/session_${sessionNum}/meta`);
 const lbRef = () => ref(db, `sessions/session_${sessionNum}/leaderboard`);
 const orderRef = () => ref(db, `sessions/session_${sessionNum}/questionOrder`);
+const controlRef = () => ref(db, `sessions/session_${sessionNum}/control`);
 const globalMetaRef = ref(db, 'global_meta');
 
 // ── Firebase 초기화 ──
@@ -554,6 +572,7 @@ async function confirmNewGame(){
     STAGES[i].questions = JSON.parse(JSON.stringify(ORIGINAL_STAGES[i].questions));
   }
   await saveGlobalMeta();
+  try{ await set(controlRef(), {globalQ:-1, updatedAt:Date.now()}); }catch(e){ console.error('진행 상태 초기화 오류:', e); }
   document.getElementById('new-game-confirm').classList.remove('show');
   updateSessionBadge();
   document.getElementById('name-input').value = '';
@@ -716,6 +735,8 @@ function showScreen(id){
 }
 function showTitleScreen(){
   clearTmr();
+  if(controlUnsub){ controlUnsub(); controlUnsub=null; }
+  playerState='idle'; lastRenderedGQ=-2;
   currentStage=0; currentQ=0; score=0; stageScores=[0,0,0,0,0];
   updateSessionBadge();
   resetParticipantForm();
@@ -731,7 +752,49 @@ async function startGame(){
   if(!playerName || !selectedGrade || !selectedDept) return;
   totalParticipants++;
   await saveGlobalMeta();
-  showStageIntro(0);
+  playerState='alive';
+  lastRenderedGQ=-2;
+  currentStage=0; currentQ=0; score=0; stageScores=[0,0,0,0,0];
+  showScreen('waiting-screen');
+  attachControlListener();
+}
+
+// ── 진행자 실시간 진행 상태 구독 (참가자용) ──
+function attachControlListener(){
+  if(controlUnsub){ controlUnsub(); controlUnsub=null; }
+  controlUnsub = onValue(controlRef(), (snap)=>{
+    const data = snap.exists() ? snap.val() : {globalQ:-1};
+    const gq = (data.globalQ===undefined || data.globalQ===null) ? -1 : data.globalQ;
+    handleControlUpdate(gq);
+  }, (err)=>{
+    console.error('진행 상태 구독 오류:', err);
+  });
+}
+
+function handleControlUpdate(gq){
+  if(playerState==='eliminated' || playerState==='cleared') return; // 결과가 정해진 참가자는 무시
+  if(gq === lastRenderedGQ) return; // 중복 이벤트 무시
+  lastRenderedGQ = gq;
+
+  if(gq <= -1){
+    showScreen('waiting-screen');
+    updateSurvivorInfo('waiting-survivor-info');
+    return;
+  }
+  if(gq >= 50){
+    if(playerState==='alive'){ clearPlayer(); }
+    return;
+  }
+  const newStage = Math.floor(gq/10);
+  const newQIdx = gq % 10;
+  currentStage = newStage;
+  currentQ = newQIdx;
+  if(newQIdx===0){
+    showStageIntroAuto(newStage);
+  } else {
+    showScreen('quiz-screen');
+    showQuestion();
+  }
 }
 
 // ── 배열 섞기 (Fisher-Yates) ──
@@ -766,18 +829,23 @@ function applyShuffleOrders(orders){
   }
 }
 
-// ── STAGE INTRO ──
-function showStageIntro(si){
-  currentStage=si; currentQ=0;
+// ── STAGE INTRO (진행자가 다음 단계 첫 문제를 공개하면 자동으로 잠깐 표시 후 전환) ──
+function showStageIntroAuto(si){
   const s=STAGES[si];
   document.getElementById('intro-badge').textContent=`${s.id}단계`;
   document.getElementById('intro-title').textContent=s.title;
   document.getElementById('intro-desc').textContent=s.desc;
   document.getElementById('intro-q-count').textContent=`${s.questions.length}문제`;
   document.getElementById('intro-type').textContent=s.type==='ox'?'O / X':'4지 선다';
+  clearTmr();
   showScreen('stage-intro');
+  setTimeout(()=>{
+    if(playerState==='alive'){
+      showScreen('quiz-screen');
+      showQuestion();
+    }
+  }, 2500);
 }
-function startStage(){ showScreen('quiz-screen'); showQuestion(); }
 
 // ── QUIZ ──
 async function showQuestion(){
@@ -793,7 +861,7 @@ async function showQuestion(){
   const fb=document.getElementById('feedback-box');
   fb.className='feedback-box'; fb.innerHTML='';
   const nb=document.getElementById('btn-next-q');
-  nb.className='btn-next-q'; nb.textContent='다음 문제 →'; nb.style.background=''; nb.onclick=null;
+  nb.className='btn-next-q'; nb.textContent=''; nb.style.background=''; nb.onclick=null;
   const grid=document.getElementById('options-grid');
   grid.innerHTML='';
   if(s.type==='ox'){
@@ -834,7 +902,7 @@ function updateTimerUI(rem,total){
 function clearTmr(){ if(tmr){clearInterval(tmr);tmr=null;} }
 
 // ── 생존자/탈락자 현황 실시간 조회 ──
-async function updateSurvivorInfo(){
+async function updateSurvivorInfo(targetId='survivor-info'){
   try{
     const snap = await get(lbRef());
     let elimCount = 0;
@@ -842,13 +910,13 @@ async function updateSurvivorInfo(){
       const data = Object.values(snap.val()).filter(v=>v && v.name);
       elimCount = data.filter(e=>e.survived===0).length;
     }
-    const el = document.getElementById('survivor-info');
+    const el = document.getElementById(targetId);
     if(el){
       el.innerHTML = `👥 전체 참여자 <strong>${totalParticipants}</strong>명 중 💀 탈락 <strong class="elim-num">${elimCount}</strong>명`;
     }
   }catch(e){
     console.error('생존 현황 조회 오류 (Firebase 규칙/네트워크 확인 필요):', e);
-    const el = document.getElementById('survivor-info');
+    const el = document.getElementById(targetId);
     if(el) el.textContent = '생존 현황을 불러올 수 없습니다';
   }
 }
@@ -865,10 +933,7 @@ function selectAnswer(val,btn){
     document.getElementById('score-display').textContent=score;
     fb.className='feedback-box correct show';
     fb.innerHTML=`✅ <strong>정답!</strong> ${q.exp}<br><span class="page-ref">${q.page}</span>`;
-    const nb=document.getElementById('btn-next-q');
-    nb.className='btn-next-q show';
-    nb.textContent=isLastQ()?'결과 보기 🏆':'다음 문제 →';
-    nb.onclick=()=>nextQuestion();
+    showWaitingForHost();
   } else {
     fb.className='feedback-box wrong show';
     fb.innerHTML=`❌ <strong>오답!</strong> 정답: ${getCorrectText(s,q)}<br>${q.exp}<br><span class="page-ref">${q.page}</span>`;
@@ -878,6 +943,15 @@ function selectAnswer(val,btn){
     nb.textContent='💀 탈락 결과 확인';
     nb.onclick=()=>eliminatePlayer(false,q.q);
   }
+}
+
+// ── 정답을 맞힌 참가자는 진행자가 다음 문제를 공개할 때까지 대기 ──
+function showWaitingForHost(){
+  const nb=document.getElementById('btn-next-q');
+  nb.className='btn-next-q show status';
+  nb.style.background='';
+  nb.onclick=null;
+  nb.textContent='⏳ 진행자가 다음 문제를 준비 중입니다...';
 }
 
 function timeoutQ(){
@@ -911,23 +985,13 @@ function getCorrectText(s,q){
   if(s.type==='ox')return q.answer==='O'?'O (⭕)':'X (❌)';
   return `${'①②③④'[q.answer]} ${q.opts[q.answer]}`;
 }
-function isLastQ(){
-  return currentStage===STAGES.length-1 && currentQ===STAGES[currentStage].questions.length-1;
-}
 function globalQNum(){
   return STAGES.slice(0,currentStage).reduce((a,s)=>a+s.questions.length,0)+currentQ+1;
-}
-function nextQuestion(){
-  const nb=document.getElementById('btn-next-q');
-  nb.style.background=''; nb.onclick=null;
-  const s=STAGES[currentStage];
-  if(currentQ<s.questions.length-1){ currentQ++; showQuestion(); }
-  else if(currentStage<STAGES.length-1){ showStageIntro(currentStage+1); }
-  else{ clearPlayer(); }
 }
 
 // ── ELIMINATION ──
 async function eliminatePlayer(isTimeout, wrongQ){
+  playerState='eliminated';
   const qNum=globalQNum();
   const entry={
     name:playerName, grade:selectedGrade, dept:selectedDept, score, qReached:qNum, survived:0,
@@ -981,6 +1045,8 @@ function showAllEliminatedScreen(){
 
 // ── CLEAR ──
 async function clearPlayer(){
+  playerState='cleared';
+  clearTmr();
   const entry={
     name:playerName, grade:selectedGrade, dept:selectedDept, score, qReached:50, survived:1,
     stage:5, reason:'생존', time:Date.now()
@@ -1059,8 +1125,6 @@ window.confirmNewGame=confirmNewGame;
 window.selectGrade=selectGrade;
 window.selectDept=selectDept;
 window.startGame=startGame;
-window.startStage=startStage;
-window.nextQuestion=nextQuestion;
 window.showLeaderboard=showLeaderboard;
 window.goBackFromLB=goBackFromLB;
 window.showTitleScreen=showTitleScreen;
