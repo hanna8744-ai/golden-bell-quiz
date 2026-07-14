@@ -508,6 +508,32 @@ async function initDB(){
   } catch(e){ console.error('Firebase 초기화 오류 (Realtime Database 규칙이 만료되었을 수 있습니다. Firebase 콘솔 > Realtime Database > 규칙을 확인하세요):', e); }
   updateSessionBadge();
   updateStartButtonState();
+
+  // ── 참여자 수 실시간 구독: 다른 사람이 접속/참여할 때마다 즉시 반영 ──
+  onValue(globalMetaRef, (snap)=>{
+    const data = snap.exists() ? snap.val() : {sessionNum:1, totalParticipants:0};
+    totalParticipants = data.totalParticipants || 0;
+    // 이미 게임에 참여 중이라면 세션 번호는 바꾸지 않음 (다른 곳에서 새 게임을 눌러도 진행 중인 참가자가 튕기지 않도록)
+    if(playerState==='idle'){
+      sessionNum = data.sessionNum || 1;
+      updateSessionBadge();
+    }
+    refreshLiveParticipantDisplays();
+  }, (err)=>{
+    console.error('참여자 수 실시간 조회 오류:', err);
+  });
+}
+
+// ── 현재 보이는 화면의 참여자 수 표시를 즉시 갱신 ──
+function refreshLiveParticipantDisplays(){
+  const waitingEl = document.getElementById('waiting-screen');
+  const quizEl = document.getElementById('quiz-screen');
+  if(waitingEl && waitingEl.classList.contains('active')){
+    updateSurvivorInfo('waiting-survivor-info');
+  }
+  if(quizEl && quizEl.classList.contains('active')){
+    updateSurvivorInfo('survivor-info');
+  }
 }
 
 async function loadLB(){
