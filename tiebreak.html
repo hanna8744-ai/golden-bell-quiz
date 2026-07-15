@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>금융골든벨 동점자 결선 도구</title>
+<style>
+  :root{--gold:#FFD700;--dark-gold:#B8860B;--navy:#1a2744;--blue:#2563eb;--green:#16a34a;--red:#dc2626;--gray:#64748b;--teal:#0f766e;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#1a2744 0%,#0f766e 100%);min-height:100vh;color:#222;padding:20px;}
+  .wrap{max-width:920px;margin:0 auto;}
+  .card{background:rgba(255,255,255,0.98);border-radius:20px;padding:28px 26px;box-shadow:0 20px 60px rgba(0,0,0,0.3);margin-bottom:18px;}
+  .center-card{max-width:480px;margin:8vh auto;}
+  h1{font-size:1.5rem;font-weight:900;color:var(--navy);margin-bottom:4px;}
+  h2{font-size:1.15rem;font-weight:800;color:var(--navy);margin-bottom:10px;}
+  .sub{color:var(--gray);font-size:0.85rem;margin-bottom:16px;}
+  .name-input{width:100%;padding:12px 15px;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;outline:none;margin-bottom:10px;}
+  .name-input:focus{border-color:var(--teal);}
+  .btn{padding:10px 18px;border:none;border-radius:10px;font-size:0.9rem;font-weight:800;cursor:pointer;color:white;background:var(--teal);}
+  .btn:hover{opacity:0.9;}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn-block{width:100%;padding:13px;font-size:0.98rem;}
+  .btn-red{background:var(--red);}
+  .btn-gray{background:#64748b;}
+  .btn-gold{background:linear-gradient(135deg,var(--gold),var(--dark-gold));color:var(--navy);}
+  .btn-small{padding:5px 10px;font-size:0.76rem;border-radius:7px;}
+  .row{display:flex;gap:10px;align-items:center;}
+  .error-msg{background:#fef2f2;border:2px solid #fca5a5;color:#991b1b;border-radius:10px;padding:10px 14px;font-size:0.83rem;margin-bottom:12px;display:none;}
+  .error-msg.show{display:block;}
+  .hidden{display:none !important;}
+  .tier-block{border-radius:14px;padding:14px 16px;margin-bottom:12px;border:2px solid #e2e8f0;}
+  .tier-block.done{background:#f0fdf4;border-color:#86efac;}
+  .tier-block.warn{background:#fff7ed;border-color:#fdba74;}
+  .tier-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .tier-title{font-weight:900;color:var(--navy);font-size:1rem;}
+  .tier-count{font-size:0.78rem;color:var(--gray);font-weight:700;}
+  .member-chip{display:inline-block;background:white;border:1px solid #e2e8f0;border-radius:20px;padding:4px 12px;margin:3px 4px 3px 0;font-size:0.8rem;}
+  .member-chip .pts{color:var(--blue);font-weight:800;margin-left:4px;}
+  .tie-alert{color:#9a3412;font-size:0.82rem;font-weight:700;margin-bottom:8px;}
+  .qbox{background:#f8fafc;border:2px solid #e2e8f0;border-radius:14px;padding:16px;margin-bottom:14px;}
+  .qbox .qnum{font-size:0.78rem;color:var(--teal);font-weight:800;margin-bottom:4px;}
+  .qbox .qtext{font-weight:700;color:var(--navy);margin-bottom:8px;font-size:1rem;}
+  .qbox .accepted{font-size:0.82rem;color:#166534;background:#f0fdf4;border-radius:8px;padding:6px 10px;display:inline-block;}
+  .roster-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:6px;background:white;}
+  .roster-item.marked-wrong{background:#fef2f2;border-color:#fca5a5;opacity:0.65;}
+  .roster-item .rname{flex:0 0 110px;font-weight:700;font-size:0.85rem;}
+  .roster-item input[type=text]{flex:1;padding:6px 9px;border:1px solid #e2e8f0;border-radius:7px;font-size:0.82rem;}
+  .roster-item .autochk{font-size:0.72rem;color:var(--green);min-width:60px;text-align:center;}
+  .round-log{font-size:0.78rem;color:var(--gray);margin-top:10px;line-height:1.7;}
+  .final-order-item{display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:0.85rem;}
+  .final-order-item .oi{width:24px;text-align:center;font-weight:800;color:var(--gray);}
+  .manual-reorder-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:5px;background:white;font-size:0.84rem;}
+  .manual-reorder-item .mname{flex:1;font-weight:700;}
+  .rank-table{width:100%;border-collapse:collapse;font-size:0.83rem;}
+  .rank-table th,.rank-table td{text-align:left;padding:6px 8px;border-bottom:1px solid #eee;}
+  .rank-table th{color:var(--gray);font-size:0.74rem;text-transform:uppercase;}
+  .back-link{display:inline-block;margin-top:10px;color:var(--gray);font-size:0.8rem;text-decoration:none;}
+  .back-link:hover{text-decoration:underline;}
+  .loading-box{text-align:center;padding:24px;color:var(--gray);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="card center-card" id="login-view">
+  <h1>🏅 동점자 결선 도구</h1>
+  <p class="sub">비밀번호를 입력하면 최종 결과를 불러와 시상 인원대로 순위를 확정할 수 있어요.</p>
+  <div class="error-msg" id="login-error">❌ 비밀번호가 올바르지 않습니다.</div>
+  <input type="password" id="login-pw-input" class="name-input" placeholder="비밀번호 입력">
+  <button class="btn btn-block" onclick="tryLogin()">✅ 입장</button>
+  <a href="index.html" class="back-link">← 참가자 페이지로</a>
+</div>
+
+<div class="hidden" id="main-view">
+
+  <div class="card">
+    <h1>🏅 동점자 결선 도구</h1>
+    <p class="sub">시상 인원: 1등 1명 · 2등 2명 · 3등 4명 · 4등 5명 · 5등 12명 · 6등 26명 (총 50명)</p>
+    <div class="row">
+      <select id="session-select" class="name-input" style="margin-bottom:0;flex:1;"></select>
+      <button class="btn" onclick="loadResults()">결과 불러오기</button>
+    </div>
+    <div class="error-msg" id="load-error"></div>
+  </div>
+
+  <div id="results-area"></div>
+
+  <div class="card hidden" id="tiebreak-area"></div>
+
+  <div class="card hidden" id="final-area"></div>
+
+</div>
+
+</div>
+
+<script src="tiebreak-questions.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBT8yXBaLulPjQGgv_wiDyRhcM4LC1CgE8",
+  authDomain: "golden-bell-quiz.firebaseapp.com",
+  databaseURL: "https://golden-bell-quiz-default-rtdb.firebaseio.com",
+  projectId: "golden-bell-quiz",
+  storageBucket: "golden-bell-quiz.firebasestorage.app",
+  messagingSenderId: "544242063266",
+  appId: "1:544242063266:web:bbb221a1660f088d1ac4fb"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const ADMIN_PASSWORD = 'welcome';
+const MAX_SESSIONS = 30;
+
+// ── 시상 티어 설정 ──
+const PRIZE_TIERS = [
+  {label:'1등', size:1},
+  {label:'2등', size:2},
+  {label:'3등', size:4},
+  {label:'4등', size:5},
+  {label:'5등', size:12},
+  {label:'6등', size:26},
+];
+const TOTAL_PRIZES = PRIZE_TIERS.reduce((a,t)=>a+t.size,0);
+
+const BONUS_QUESTIONS = window.TIEBREAK_QUESTIONS; // tiebreak-questions.js 에서 로드
+
+let sessionNum = 1;
+let currentList = [];      // 정렬된 leaderboard entries (동점 해소되면서 계속 갱신됨)
+let globalQPointer = 0;    // 동점자 문제 은행 포인터 (전체 세션 통틀어 재사용 방지)
+let activeTie = null;      // 현재 진행 중인 tie-break 세션 상태
+let resolvedCounter = 0;   // 동점자 확정 순서에 부여하는 전역 유일 번호 (재탐지 방지용)
+
+function tryLogin(){
+  const pw = document.getElementById('login-pw-input').value;
+  const errBox = document.getElementById('login-error');
+  if(pw !== ADMIN_PASSWORD){
+    errBox.classList.add('show');
+    document.getElementById('login-pw-input').value='';
+    return;
+  }
+  errBox.classList.remove('show');
+  document.getElementById('login-view').classList.add('hidden');
+  document.getElementById('main-view').classList.remove('hidden');
+  populateSessionSelect();
+};
+document.getElementById('login-pw-input').addEventListener('keydown',(e)=>{ if(e.key==='Enter') tryLogin(); });
+
+async function populateSessionSelect(){
+  const sel = document.getElementById('session-select');
+  sel.innerHTML='';
+  let liveSessionNum = 1;
+  try{
+    const snap = await get(ref(db,'global_meta'));
+    if(snap.exists()) liveSessionNum = snap.val().sessionNum || 1;
+  }catch(e){}
+  const maxOpt = Math.max(MAX_SESSIONS, liveSessionNum);
+  for(let i=1;i<=maxOpt;i++){
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${i}회차` + (i===liveSessionNum? ' (최근 회차)':'');
+    sel.appendChild(opt);
+  }
+  sel.value = liveSessionNum;
+}
+
+function normalizeAnswer(s){
+  return (s||'').replace(/\s+/g,'').trim();
+}
+
+function groupKey(e){
+  if(e._resolved !== undefined) return 'resolved:'+e._resolved;
+  return e.score + ':' + e.qReached;
+}
+
+// ── 시상 구간을 순서대로 잘라내며, 경계를 걸치는 동점 그룹을 찾는다 ──
+// 불변식: 이전 등수까지는 이미 경계가 깨끗하게 잘렸으므로, 이번 등수의 경계가
+// 뒤로(다음 등수 방향으로) 넘어가는지(b가 필요 인원을 초과하는지)만 확인하면 충분하다.
+function sliceTiers(list){
+  let idx = 0;
+  const tiers = [];
+  for(const tier of PRIZE_TIERS){
+    const need = tier.size;
+    if(idx >= list.length){
+      tiers.push({label:tier.label, size:need, members:[]});
+      continue;
+    }
+    if(idx + need > list.length){
+      tiers.push({label:tier.label, size:need, members:list.slice(idx)});
+      idx = list.length;
+      continue;
+    }
+    const boundaryEntry = list[idx+need-1];
+    const key = groupKey(boundaryEntry);
+    let b = idx+need-1;
+    while(b+1<list.length && groupKey(list[b+1])===key) b++;
+    if(b === idx+need-1){
+      tiers.push({label:tier.label, size:need, members:list.slice(idx, idx+need)});
+      idx += need;
+    } else {
+      let a = idx+need-1;
+      while(a-1>=idx && groupKey(list[a-1])===key) a--;
+      return { tiers, tieIssue:{ rangeStart:a, rangeEnd:b, members:list.slice(a,b+1) } };
+    }
+  }
+  return { tiers, tieIssue:null };
+}
+
+async function loadResults(){
+  const n = parseInt(document.getElementById('session-select').value, 10);
+  sessionNum = n;
+  const errBox = document.getElementById('load-error');
+  errBox.classList.remove('show'); errBox.textContent='';
+  document.getElementById('results-area').innerHTML = '<div class="card loading-box">불러오는 중...</div>';
+  document.getElementById('tiebreak-area').classList.add('hidden');
+  document.getElementById('final-area').classList.add('hidden');
+  try{
+    const snap = await get(ref(db, `sessions/session_${n}/leaderboard`));
+    let list = snap.exists() ? Object.values(snap.val()).filter(v=>v && v.name) : [];
+    list.sort((a,b)=>{
+      if(b.score!==a.score) return b.score-a.score;
+      return b.qReached-a.qReached;
+    });
+    currentList = list;
+    globalQPointer = 0;
+    activeTie = null;
+    if(!list.length){
+      document.getElementById('results-area').innerHTML =
+        '<div class="card">이 회차에는 아직 기록된 결과가 없습니다. 게임이 끝난 뒤 다시 불러와주세요.</div>';
+      return;
+    }
+    if(list.length < TOTAL_PRIZES){
+      errBox.textContent = `⚠️ 참고: 기록된 인원(${list.length}명)이 전체 시상 인원(${TOTAL_PRIZES}명)보다 적어요. 마지막 등수 일부는 인원이 부족한 채로 표시돼요.`;
+      errBox.classList.add('show');
+    }
+    renderResults();
+  }catch(e){
+    console.error('결과 조회 오류:', e);
+    errBox.textContent = '결과를 불러올 수 없습니다. Firebase 규칙/네트워크를 확인해주세요.';
+    errBox.classList.add('show');
+    document.getElementById('results-area').innerHTML = '';
+  }
+}
+
+function renderResults(){
+  const { tiers, tieIssue } = sliceTiers(currentList);
+  const area = document.getElementById('results-area');
+  let html = '<div class="card"><h2>회차 ' + sessionNum + ' 시상 순위 현황</h2>';
+  tiers.forEach(tier=>{
+    const isShort = tier.members.length < tier.size;
+    html += `<div class="tier-block ${isShort? '' : 'done'}">
+      <div class="tier-head">
+        <div class="tier-title">${tier.label}</div>
+        <div class="tier-count">${tier.members.length} / ${tier.size}명</div>
+      </div>
+      <div>${tier.members.map(m=>`<span class="member-chip">${m.name}<span class="pts">${m.score}점</span></span>`).join('')}</div>
+      ${isShort? '<div class="tie-alert" style="color:#94a3b8;">⚠ 이 등수는 인원이 부족해요 (전체 참여자 수 확인 필요)</div>' : ''}
+    </div>`;
+  });
+  if(tieIssue){
+    html += `<div class="tier-block warn">
+      <div class="tier-head"><div class="tier-title">⚠ 동점자 결선 필요</div></div>
+      <div class="tie-alert">${tieIssue.members.length}명이 동점으로 묶여 있어서, 이 지점의 등수를 정확히 나눌 수 없어요.</div>
+      <div>${tieIssue.members.map(m=>`<span class="member-chip">${m.name}<span class="pts">${m.score}점</span></span>`).join('')}</div>
+      <button class="btn btn-red" style="margin-top:10px;" onclick="startTieBreak()">🏁 이 그룹으로 동점자 퀴즈 시작</button>
+    </div>`;
+  }
+  html += '</div>';
+  area.innerHTML = html;
+
+  if(!tieIssue){
+    renderFinalRanking(tiers);
+  } else {
+    document.getElementById('final-area').classList.add('hidden');
+  }
+}
+
+function renderFinalRanking(tiers){
+  const area = document.getElementById('final-area');
+  area.classList.remove('hidden');
+  let rank = 1;
+  let rows = '';
+  tiers.forEach(tier=>{
+    tier.members.forEach(m=>{
+      rows += `<tr><td>${rank}</td><td>${tier.label}</td><td>${m.name}</td><td>${m.grade||''} ${m.dept||''}</td><td>${m.score}점</td></tr>`;
+      rank++;
+    });
+  });
+  area.innerHTML = `<h2>🎉 최종 순위 확정 (${rank-1}명)</h2>
+    <p class="sub">모든 동점 구간이 해소됐어요. 아래 표를 그대로 공지/인쇄에 활용하세요.</p>
+    <table class="rank-table"><thead><tr><th>순위</th><th>등수</th><th>이름</th><th>학년·과</th><th>점수</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <button class="btn" style="margin-top:12px;" onclick="copyFinalRanking()">📋 결과 복사 (표 형식)</button>`;
+  window.__finalRankingRows = tiers.flatMap(t=>t.members.map(m=>({tier:t.label, name:m.name, grade:m.grade, dept:m.dept, score:m.score})));
+}
+
+function copyFinalRanking(){
+  const rows = window.__finalRankingRows || [];
+  let rank=1;
+  const text = rows.map(r=>`${rank++}\t${r.tier}\t${r.name}\t${r.grade||''} ${r.dept||''}\t${r.score}점`).join('\n');
+  navigator.clipboard.writeText('순위\t등수\t이름\t학년·과\t점수\n'+text).then(()=>{
+    alert('✅ 클립보드에 복사했어요. 엑셀/한글에 붙여넣으세요.');
+  }).catch(()=>{
+    alert('복사에 실패했습니다. 브라우저 클립보드 권한을 확인해주세요.');
+  });
+}
+
+// ── 동점자 결선 실행 ──
+function startTieBreak(){
+  const { tieIssue } = sliceTiers(currentList);
+  if(!tieIssue) return;
+  activeTie = {
+    rangeStart: tieIssue.rangeStart,
+    rangeEnd: tieIssue.rangeEnd,
+    original: tieIssue.members,      // 원본 순서(참고용)
+    active: tieIssue.members.map(m=>m.name), // 아직 안 걸러진 사람들 (이름 기준)
+    rounds: [],                       // [{qIndex, eliminated:[names]}]
+    markedWrong: new Set(),
+  };
+  renderTieBreak();
+  document.getElementById('tiebreak-area').classList.remove('hidden');
+  document.getElementById('tiebreak-area').scrollIntoView({behavior:'smooth'});
+}
+
+function renderTieBreak(){
+  const area = document.getElementById('tiebreak-area');
+  if(!activeTie){ area.classList.add('hidden'); return; }
+
+  if(globalQPointer >= BONUS_QUESTIONS.length){
+    renderManualFinish();
+    return;
+  }
+
+  const q = BONUS_QUESTIONS[globalQPointer];
+  const acceptedText = q.answers.join(' / ');
+
+  let roster = activeTie.active.map(name=>{
+    const marked = activeTie.markedWrong.has(name);
+    return `<div class="roster-item ${marked?'marked-wrong':''}" id="roster-${cssId(name)}">
+      <span class="rname">${name}</span>
+      <input type="text" placeholder="답변 입력(선택)" oninput="checkAnswerHint('${escAttr(name)}', this.value)">
+      <span class="autochk" id="hint-${cssId(name)}"></span>
+      <button class="btn btn-small ${marked?'btn-gray':'btn-red'}" onclick="toggleWrong('${escAttr(name)}')">${marked? '되돌리기':'오답 처리'}</button>
+    </div>`;
+  }).join('');
+
+  area.innerHTML = `<h2>🏁 동점자 결선 진행 중 (${activeTie.active.length}명 남음)</h2>
+    <div class="qbox">
+      <div class="qnum">보너스 문제 ${globalQPointer+1} / ${BONUS_QUESTIONS.length}</div>
+      <div class="qtext">${q.q}</div>
+      <span class="accepted">✅ 정답 인정: ${acceptedText}</span>
+      <div style="font-size:0.8rem;color:#666;margin-top:6px;">💡 ${q.exp} <span style="color:#94a3b8;">(${q.page})</span></div>
+    </div>
+    <div>${roster}</div>
+    <div class="row" style="margin-top:12px;">
+      <button class="btn" onclick="finishRound()">➡ 이 문제 마감 · 다음 문제로</button>
+      <button class="btn btn-gold" onclick="tryFinalizeTie()">🏆 지금 결선 확정</button>
+      <button class="btn btn-gray" onclick="cancelTieBreak()">취소</button>
+    </div>
+    <div class="round-log">${renderRoundLog()}</div>`;
+}
+
+function cssId(name){ return name.replace(/[^a-zA-Z0-9가-힣]/g,'_'); }
+function escAttr(name){ return name.replace(/'/g,"\\'"); }
+
+function checkAnswerHint(name, val){
+  const q = BONUS_QUESTIONS[globalQPointer];
+  const hintEl = document.getElementById('hint-'+cssId(name));
+  if(!hintEl) return;
+  const norm = normalizeAnswer(val);
+  if(!norm){ hintEl.textContent=''; return; }
+  const isMatch = q.answers.some(a=>normalizeAnswer(a)===norm);
+  hintEl.textContent = isMatch ? '✅ 일치' : '';
+  hintEl.style.color = isMatch ? 'var(--green)' : 'var(--red)';
+}
+
+function toggleWrong(name){
+  if(activeTie.markedWrong.has(name)) activeTie.markedWrong.delete(name);
+  else activeTie.markedWrong.add(name);
+  renderTieBreak();
+}
+
+function renderRoundLog(){
+  if(!activeTie.rounds.length) return '';
+  return '지난 라운드 기록:<br>' + activeTie.rounds.map((r,i)=>
+    `${i+1}라운드(문제 ${r.qIndex+1}번): 오답 → ${r.eliminated.join(', ')||'(없음)'}`
+  ).join('<br>');
+}
+
+function finishRound(){
+  const eliminated = Array.from(activeTie.markedWrong);
+  activeTie.rounds.push({ qIndex: globalQPointer, eliminated });
+  activeTie.active = activeTie.active.filter(n=>!eliminated.includes(n));
+  activeTie.markedWrong = new Set();
+  globalQPointer++;
+
+  if(activeTie.active.length <= 1){
+    tryFinalizeTie();
+    return;
+  }
+  renderTieBreak();
+}
+
+// 문제가 소진됐을 때 수동으로 순서를 정하는 보조 화면
+function renderManualFinish(){
+  const area = document.getElementById('tiebreak-area');
+  const order = activeTie.active.slice();
+  area.innerHTML = `<h2>⚠️ 보너스 문제를 모두 사용했어요</h2>
+    <p class="sub">아직 ${order.length}명이 동점이에요. 아래에서 순서(▲ 위로 = 더 높은 등수)를 직접 정한 뒤 확정해주세요.</p>
+    <div id="manual-order-list">${order.map((n,i)=>renderManualItem(n,i,order.length)).join('')}</div>
+    <div class="round-log">${renderRoundLog()}</div>
+    <button class="btn btn-gold" style="margin-top:12px;" onclick="finalizeManualOrder()">🏆 이 순서로 결선 확정</button>
+    <button class="btn btn-gray" style="margin-top:12px;" onclick="cancelTieBreak()">취소</button>`;
+  window.__manualOrder = order;
+}
+function renderManualItem(name, i, total){
+  return `<div class="manual-reorder-item" data-idx="${i}">
+    <span class="mname">${i+1}. ${name}</span>
+    <button class="btn btn-small btn-gray" ${i===0?'disabled':''} onclick="moveManual(${i},-1)">▲</button>
+    <button class="btn btn-small btn-gray" ${i===total-1?'disabled':''} onclick="moveManual(${i},1)">▼</button>
+  </div>`;
+}
+function moveManual(i, dir){
+  const order = window.__manualOrder;
+  const j = i+dir;
+  if(j<0||j>=order.length) return;
+  [order[i],order[j]] = [order[j],order[i]];
+  document.getElementById('manual-order-list').innerHTML = order.map((n,idx)=>renderManualItem(n,idx,order.length)).join('');
+}
+function finalizeManualOrder(){
+  activeTie.rounds.push({ qIndex:-1, eliminated: window.__manualOrder.slice().reverse() }); // 수동 순서를 라운드처럼 기록(최하위부터)
+  activeTie.active = [];
+  finishTieBreakWith(window.__manualOrder);
+}
+
+function tryFinalizeTie(){
+  // 아직 마킹 안 하고 남아있는 문제 도중이면, 현재까지의 마킹을 이번 라운드로 반영 후 확정
+  if(activeTie.markedWrong.size>0){
+    const eliminated = Array.from(activeTie.markedWrong);
+    activeTie.rounds.push({ qIndex: globalQPointer, eliminated });
+    activeTie.active = activeTie.active.filter(n=>!eliminated.includes(n));
+    activeTie.markedWrong = new Set();
+    globalQPointer++;
+  }
+  if(activeTie.active.length > 1){
+    alert(`아직 ${activeTie.active.length}명이 정리되지 않았어요. 문제를 더 진행하거나, 문제를 모두 소진하면 수동으로 순서를 정할 수 있어요.`);
+    renderTieBreak();
+    return;
+  }
+  // 최종 순서 = active(1명, 최상위) + 라운드 역순(나중에 탈락한 사람이 더 높은 등수)
+  const order = activeTie.active.slice();
+  for(let i=activeTie.rounds.length-1;i>=0;i--){
+    order.push(...activeTie.rounds[i].eliminated);
+  }
+  finishTieBreakWith(order);
+}
+
+function finishTieBreakWith(orderedNames){
+  // orderedNames: 그룹 내 등수 순서(1등→꼴찌) 이름 배열. currentList에서 해당 구간을 이 순서로 재배치.
+  const { rangeStart, rangeEnd, original } = activeTie;
+  const byName = {};
+  original.forEach(m=>{ byName[m.name] = byName[m.name]||[]; byName[m.name].push(m); });
+  const reordered = orderedNames.map((n)=>{
+    const arr = byName[n];
+    const entry = arr && arr.length ? arr.shift() : null;
+    if(entry) entry._resolved = resolvedCounter++; // 동점자 문제로 순서가 확정됐음을 표시 (재탐지 방지, 전역 유일 번호)
+    return entry;
+  }).filter(Boolean);
+  // 예외: 이름이 안 맞아떨어지면(동명이인 등) 안전하게 원본 순서 유지
+  if(reordered.length !== original.length){
+    console.error('동점자 재배치 개수 불일치 - 원본 순서를 유지합니다.', reordered.length, original.length);
+    activeTie = null;
+    renderTieBreak();
+    return;
+  }
+  currentList = currentList.slice(0, rangeStart).concat(reordered, currentList.slice(rangeEnd+1));
+  activeTie = null;
+  document.getElementById('tiebreak-area').classList.add('hidden');
+  renderResults();
+}
+
+function cancelTieBreak(){
+  activeTie = null;
+  document.getElementById('tiebreak-area').classList.add('hidden');
+}
+
+window.tryLogin = tryLogin;
+window.loadResults = loadResults;
+window.startTieBreak = startTieBreak;
+window.toggleWrong = toggleWrong;
+window.checkAnswerHint = checkAnswerHint;
+window.finishRound = finishRound;
+window.tryFinalizeTie = tryFinalizeTie;
+window.cancelTieBreak = cancelTieBreak;
+window.moveManual = moveManual;
+window.finalizeManualOrder = finalizeManualOrder;
+window.copyFinalRanking = copyFinalRanking;
+</script>
+</body>
+</html>
