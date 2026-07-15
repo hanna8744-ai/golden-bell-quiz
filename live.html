@@ -20,17 +20,20 @@
   .info-card .num{font-size:1.4rem;font-weight:900;color:var(--blue);}
   .info-card .label{font-size:0.7rem;color:var(--gray);}
   .rule-box{background:#fff3cd;border:2px solid var(--gold);border-radius:12px;padding:11px 15px;margin-bottom:18px;font-size:0.82rem;color:#7a5700;text-align:left;line-height:1.7;}
+  .join-closed-box{display:none;background:#fef2f2;border:2px solid var(--red);border-radius:12px;padding:12px 15px;margin-bottom:16px;font-size:0.85rem;color:#991b1b;text-align:center;line-height:1.7;}
+  .join-closed-box.show{display:block;}
+  .participant-form.disabled-form{opacity:0.4;pointer-events:none;}
   .rule-box strong{display:block;margin-bottom:3px;font-size:0.88rem;}
   .name-input{width:100%;padding:12px 15px;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;outline:none;transition:border 0.2s;margin-bottom:12px;}
   .name-input:focus{border-color:var(--blue);}
   .btn-start{width:100%;padding:14px;background:linear-gradient(135deg,var(--gold),var(--dark-gold));border:none;border-radius:14px;font-size:1.05rem;font-weight:800;color:var(--navy);cursor:pointer;letter-spacing:1px;transition:transform 0.15s;}
-  .btn-start:hover{transform:translateY(-2px);}
+  @media (hover:hover) and (pointer:fine){ .btn-start:hover{transform:translateY(-2px);} }
   .btn-start:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
   .new-game-wrap{position:relative;width:100%;display:flex;justify-content:flex-end;gap:8px;margin-bottom:6px;}
   .btn-new-game{background:#e53e3e;color:white;border:none;border-radius:10px;padding:7px 14px;font-size:0.78rem;font-weight:800;cursor:pointer;transition:background 0.2s;}
-  .btn-new-game:hover{background:#c53030;}
+  @media (hover:hover) and (pointer:fine){ .btn-new-game:hover{background:#c53030;} }
   .btn-admin{background:#334155;color:white;border:none;border-radius:10px;padding:7px 14px;font-size:0.78rem;font-weight:800;cursor:pointer;transition:background 0.2s;}
-  .btn-admin:hover{background:#1e293b;}
+  @media (hover:hover) and (pointer:fine){ .btn-admin:hover{background:#1e293b;} }
   .admin-summary-card{background:#f0f4ff;border-radius:12px;padding:10px;text-align:center;}
   .admin-summary-card .num{font-size:1.25rem;font-weight:900;color:var(--blue);}
   .admin-summary-card .label{font-size:0.68rem;color:var(--gray);}
@@ -45,7 +48,7 @@
   .select-group{display:flex;gap:7px;flex-wrap:wrap;}
   .dept-group{gap:6px;}
   .sel-btn{padding:8px 14px;border:2px solid #e2e8f0;border-radius:10px;background:white;font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.15s;color:#444;}
-  .sel-btn:hover{border-color:var(--blue);background:#f0f4ff;}
+  @media (hover:hover) and (pointer:fine){ .sel-btn:hover{border-color:var(--blue);background:#f0f4ff;} }
   .sel-btn.selected{border-color:var(--blue);background:var(--blue);color:white;font-weight:800;}
   .stage-card{background:rgba(255,255,255,0.97);border-radius:24px;padding:40px 34px;max-width:460px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;}
   .stage-badge{display:inline-block;background:linear-gradient(135deg,var(--gold),var(--dark-gold));color:var(--navy);font-weight:900;font-size:0.85rem;padding:6px 20px;border-radius:30px;margin-bottom:12px;}
@@ -55,7 +58,7 @@
   .meta-chip{background:#f0f4ff;border-radius:30px;padding:6px 13px;font-size:0.78rem;color:var(--blue);font-weight:700;}
   .survival-chip{background:#fff0f0;border-radius:30px;padding:6px 13px;font-size:0.78rem;color:var(--red);font-weight:700;}
   .btn-next-stage{padding:12px 34px;background:var(--navy);border:none;border-radius:12px;color:white;font-size:0.96rem;font-weight:700;cursor:pointer;}
-  .btn-next-stage:hover{background:var(--blue);}
+  @media (hover:hover) and (pointer:fine){ .btn-next-stage:hover{background:var(--blue);} }
   #quiz-screen{padding:14px;}
   .quiz-container{background:white;border-radius:20px;padding:24px;max-width:660px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.2);}
   .quiz-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
@@ -76,7 +79,7 @@
   .options-grid{display:grid;gap:8px;}
   .options-grid.ox{grid-template-columns:1fr 1fr;}
   .opt-btn{padding:12px 15px;border:2.5px solid #e2e8f0;border-radius:12px;background:white;font-size:0.9rem;font-weight:600;cursor:pointer;transition:all 0.2s;text-align:left;display:flex;align-items:center;gap:9px;}
-  .opt-btn:hover:not(:disabled){border-color:var(--blue);background:#f0f4ff;transform:translateX(3px);}
+  @media (hover:hover) and (pointer:fine){ .opt-btn:hover:not(:disabled){border-color:var(--blue);background:#f0f4ff;transform:translateX(3px);} }
   .opt-btn.ox-btn{justify-content:center;font-size:2.1rem;font-weight:900;}
   .opt-btn .opt-label{background:#e2e8f0;border-radius:8px;padding:2px 7px;font-size:0.73rem;font-weight:800;color:var(--gray);min-width:22px;text-align:center;flex-shrink:0;}
   .opt-btn.correct{border-color:var(--green);background:#f0fdf4;color:var(--green);}
@@ -91,7 +94,7 @@
   .page-ref{display:inline-block;margin-top:5px;background:#e0f2fe;color:#0369a1;border-radius:8px;padding:2px 9px;font-size:0.75rem;font-weight:700;}
   .btn-next-q{margin-top:12px;width:100%;padding:12px;background:var(--navy);border:none;border-radius:12px;color:white;font-size:0.94rem;font-weight:700;cursor:pointer;display:none;transition:background 0.2s;}
   .btn-next-q.show{display:block;}
-  .btn-next-q:hover{background:var(--blue);}
+  @media (hover:hover) and (pointer:fine){ .btn-next-q:hover{background:var(--blue);} }
   .btn-next-q.status{cursor:default;background:#94a3b8 !important;}
   .waiting-pulse{animation:pulse 1.6s ease-in-out infinite;}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
@@ -108,7 +111,7 @@
   .no-retry-box{background:#f1f5f9;border:2px solid #cbd5e1;border-radius:12px;padding:11px 15px;margin:12px 0;font-size:0.81rem;color:#475569;line-height:1.6;text-align:center;}
   .no-retry-box strong{color:var(--red);}
   .btn-elim-lb{width:100%;padding:13px;background:var(--navy);border:none;border-radius:12px;color:white;font-size:0.96rem;font-weight:700;cursor:pointer;}
-  .btn-elim-lb:hover{background:var(--blue);}
+  @media (hover:hover) and (pointer:fine){ .btn-elim-lb:hover{background:var(--blue);} }
   #all-elim-screen{text-align:center;}
   .all-elim-card{background:rgba(255,255,255,0.97);border-radius:24px;padding:38px 32px;max-width:540px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
   .all-elim-icon{font-size:64px;display:block;margin-bottom:8px;}
@@ -210,6 +213,10 @@
       · 모든 참가자 탈락 시 → 순위 및 점수 자동 공개<br>
       · 50문제를 모두 맞히면 <strong>골든벨 달성!</strong><br>
       · 🔄 새 게임 버튼으로 순위 초기화 후 새로 시작
+    </div>
+    <div class="join-closed-box" id="join-closed-box">
+      🚫 <strong>이미 문제 풀이가 시작되어 더 이상 참여할 수 없습니다.</strong><br>
+      다음 회차를 기다려주시거나 진행자에게 문의해주세요.
     </div>
     <div class="participant-form">
       <div class="form-label">① 학년 선택</div>
@@ -503,6 +510,7 @@ async function initDB(){
   } catch(e){ console.error('Firebase 초기화 오류 (Realtime Database 규칙이 만료되었을 수 있습니다. Firebase 콘솔 > Realtime Database > 규칙을 확인하세요):', e); }
   updateSessionBadge();
   updateStartButtonState();
+  watchLobbyControl();
 
   // ── 참여자 수 실시간 구독: 다른 사람이 접속/참여할 때마다 즉시 반영 ──
   onValue(globalMetaRef, (snap)=>{
@@ -510,13 +518,51 @@ async function initDB(){
     totalParticipants = data.totalParticipants || 0;
     // 이미 게임에 참여 중이라면 세션 번호는 바꾸지 않음 (다른 곳에서 새 게임을 눌러도 진행 중인 참가자가 튕기지 않도록)
     if(playerState==='idle'){
-      sessionNum = data.sessionNum || 1;
+      const newSessionNum = data.sessionNum || 1;
+      const sessionChanged = newSessionNum !== sessionNum;
+      sessionNum = newSessionNum;
       updateSessionBadge();
+      if(sessionChanged) watchLobbyControl(); // 세션이 바뀌면 그 회차의 진행 상태를 새로 구독
     }
     refreshLiveParticipantDisplays();
   }, (err)=>{
     console.error('참여자 수 실시간 조회 오류:', err);
   });
+}
+
+// ── 문제 풀이가 이미 시작됐는지 실시간 감시 (참여 마감 여부 판단용) ──
+let lobbyControlUnsub = null;
+let gameHasStarted = false;
+
+function watchLobbyControl(){
+  if(lobbyControlUnsub){ lobbyControlUnsub(); lobbyControlUnsub=null; }
+  lobbyControlUnsub = onValue(controlRef(), (snap)=>{
+    const data = snap.exists() ? snap.val() : {globalQ:-1};
+    const gq = (data.globalQ===undefined || data.globalQ===null) ? -1 : data.globalQ;
+    updateJoinAvailability(gq);
+  }, (err)=>{
+    console.error('참여 가능 여부 조회 오류:', err);
+  });
+}
+
+function updateJoinAvailability(gq){
+  gameHasStarted = gq > -1;
+  if(playerState!=='idle') return; // 이미 참여한 사람 화면은 건드리지 않음
+  const box = document.getElementById('join-closed-box');
+  const form = document.querySelector('.participant-form');
+  const btn = document.getElementById('btn-start');
+  if(!box || !form || !btn) return;
+  if(gameHasStarted){
+    box.classList.add('show');
+    form.classList.add('disabled-form');
+    btn.disabled = true;
+    btn.textContent = '🚫 참여 마감';
+  } else {
+    box.classList.remove('show');
+    form.classList.remove('disabled-form');
+    btn.textContent = '🔔 골든벨 도전!';
+    updateStartButtonState();
+  }
 }
 
 // ── 현재 보이는 화면의 참여자 수 표시를 즉시 갱신 ──
@@ -743,6 +789,7 @@ function selectDept(btn, val){
   updateStartButtonState();
 }
 function updateStartButtonState(){
+  if(gameHasStarted) return; // 이미 마감된 상태에서는 버튼 상태를 건드리지 않음
   const name = document.getElementById('name-input').value.trim();
   document.getElementById('btn-start').disabled =
     !(selectedGrade && selectedDept && name.length>=1);
@@ -766,6 +813,7 @@ function showTitleScreen(){
   currentStage=0; currentQ=0; score=0; stageScores=[0,0,0,0,0];
   updateSessionBadge();
   resetParticipantForm();
+  watchLobbyControl();
   showScreen('title-screen');
 }
 
@@ -776,6 +824,19 @@ document.getElementById('name-input').addEventListener('input', function(){
 async function startGame(){
   playerName = document.getElementById('name-input').value.trim();
   if(!playerName || !selectedGrade || !selectedDept) return;
+  if(gameHasStarted){
+    updateJoinAvailability(0);
+    return;
+  }
+  // 클릭 시점에 최신 상태를 한 번 더 확인 (버튼을 누르는 찰나에 진행자가 시작한 경우 대비)
+  try{
+    const snap = await get(controlRef());
+    const gq = snap.exists() ? ((snap.val().globalQ===undefined||snap.val().globalQ===null)?-1:snap.val().globalQ) : -1;
+    if(gq > -1){
+      updateJoinAvailability(gq);
+      return;
+    }
+  }catch(e){ console.error('참여 가능 여부 확인 오류:', e); }
   totalParticipants++;
   await saveGlobalMeta();
   await saveParticipantEntry(); // 문제를 풀기 전, 접속 시점에 참가자 정보를 즉시 기록 (관리자 페이지에서 사전 확인용)
@@ -921,6 +982,7 @@ function showStageIntroAuto(si, onDone){
 // ── QUIZ: 문제 표시와 동시에 타이머 시작 (진행자가 공개한 시각(startTime) 기준으로 모두 동기화) ──
 function renderQuestion(phase, startTime){
   clearTmr(); answered=false;
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); // 이전 문제 버튼의 포커스/활성 상태 잔류 방지
   const s=STAGES[currentStage], q=s.questions[currentQ];
   const total=50, done=STAGES.slice(0,currentStage).reduce((a,x)=>a+x.questions.length,0)+currentQ;
   document.getElementById('q-stage-tag').textContent=`${s.id}단계`;
