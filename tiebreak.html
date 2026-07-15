@@ -149,6 +149,8 @@ let tbStartTime = null;
 let tbTickInterval = null;
 let tbRevealTimeout = null;
 let tbSubmissionsUnsub = null;
+let tbPresenceUnsub = null;
+let tbPresence = {}; // {safeKey(name): {name, joinedAt}} - 참가자가 tiebreak-live.html에 접속했는지 여부
 let tbLiveSubmissions = {}; // {name: {text, submittedAt}} - 현재 문제에 대한 참가자 실시간 제출 답변
 
 function safeKey(name){ return (name||'').replace(/[.#$\[\]\/]/g,'_'); }
@@ -341,7 +343,48 @@ function startTieBreak(){
   };
   document.getElementById('tiebreak-area').classList.remove('hidden');
   document.getElementById('tiebreak-area').scrollIntoView({behavior:'smooth'});
-  beginRound();
+  enterLobby();
+}
+
+// ── 로비: 문제를 내기 전에 동점자들이 tiebreak-live.html에 잘 접속했는지 먼저 확인 ──
+function enterLobby(){
+  clearTbTimers();
+  if(tbSubmissionsUnsub){ tbSubmissionsUnsub(); tbSubmissionsUnsub=null; }
+  tbPhase = 'lobby';
+  tbStartTime = null;
+  tbLiveSubmissions = {};
+  tbPresence = {};
+  writeTbState();
+  watchPresence();
+  renderTieBreak();
+}
+
+function watchPresence(){
+  if(tbPresenceUnsub){ tbPresenceUnsub(); tbPresenceUnsub=null; }
+  tbPresenceUnsub = onValue(ref(db, `sessions/session_${sessionNum}/tiebreak/presence`), (snap)=>{
+    tbPresence = snap.exists() ? snap.val() : {};
+    if(activeTie && tbPhase==='lobby') renderTieBreak();
+  }, (err)=>{ console.error('참가자 접속 현황 조회 오류:', err); });
+}
+
+function renderLobby(){
+  const area = document.getElementById('tiebreak-area');
+  const joinedCount = activeTie.active.filter(n=>!!tbPresence[safeKey(n)]).length;
+  const rows = activeTie.active.map(name=>{
+    const joined = !!tbPresence[safeKey(name)];
+    return `<div class="roster-item">
+      <span class="rname">${name}</span>
+      <span class="autochk" style="flex:1;text-align:right;color:${joined?'var(--green)':'var(--gray)'};font-weight:700;">${joined? '✅ 참여 완료' : '⏳ 대기 중'}</span>
+    </div>`;
+  }).join('');
+  const allJoined = joinedCount === activeTie.active.length;
+  area.innerHTML = `<h2>👥 참가자 접속 현황 (${joinedCount} / ${activeTie.active.length}명 참여)</h2>
+    <p class="sub">동점자 학생들에게 <strong>tiebreak-live.html</strong> 접속 후 본인 이름을 입력하도록 안내해주세요. ${allJoined? '전원 접속을 확인했어요!' : '전원 접속을 확인한 뒤 시작하는 것을 추천해요.'}</p>
+    <div>${rows}</div>
+    <div class="row" style="margin-top:14px;">
+      <button class="btn btn-gold" onclick="beginRound()">▶ 문제 풀이 시작${allJoined?'':' (아직 전원 접속 전)'}</button>
+      <button class="btn btn-gray" onclick="cancelTieBreak()">취소</button>
+    </div>`;
 }
 
 // ── 한 문제(라운드) 시작: 문제만 공개 + 30초 타이머 즉시 시작, 참가자에게도 동기화 ──
@@ -427,6 +470,11 @@ function renderTieBreak(){
   const area = document.getElementById('tiebreak-area');
   if(!activeTie){ area.classList.add('hidden'); return; }
 
+  if(tbPhase==='lobby'){
+    renderLobby();
+    return;
+  }
+
   if(globalQPointer >= BONUS_QUESTIONS.length){
     clearTbTimers();
     renderManualFinish();
@@ -439,18 +487,27 @@ function renderTieBreak(){
   let roster = activeTie.active.map(name=>{
     const marked = activeTie.markedWrong.has(name);
     const submitted = tbLiveSubmissions[safeKey(name)];
+    const hasSubmitted = !!submitted;
     const submittedText = submitted ? submitted.text : '';
     const isMatch = submittedText && q.answers.some(a=>normalizeAnswer(a)===normalizeAnswer(submittedText));
     let statusLabel = '';
+    let inputValue = '';
+    let inputPlaceholder = '';
+    let inputDisabled = '';
     if(isReveal){
+      inputValue = submittedText;
+      inputPlaceholder = '답변 입력(참가자 미접속 시 대신 입력)';
       statusLabel = marked ? (submittedText? '❌ 오답(자동)':'❌ 미제출(자동)') : '✅ 정답(자동)';
-    } else if(submittedText){
-      statusLabel = isMatch ? '✅ 일치' : '제출됨';
+    } else {
+      // 문제 풀이 중(active)에는 답변 내용을 숨겨서 정답이 노출되지 않도록 함 — 제출 여부만 표시
+      inputPlaceholder = hasSubmitted ? '✅ 제출 완료 (시간 종료 후 공개)' : '⏳ 아직 제출 전';
+      inputDisabled = 'disabled';
+      statusLabel = hasSubmitted ? '📝 제출됨' : '';
     }
     return `<div class="roster-item ${marked?'marked-wrong':''}" id="roster-${cssId(name)}">
       <span class="rname">${name}</span>
-      <input type="text" placeholder="답변 입력(참가자 미접속 시 대신 입력)" value="${(submittedText||'').replace(/"/g,'&quot;')}" oninput="checkAnswerHint('${escAttr(name)}', this.value)">
-      <span class="autochk" id="hint-${cssId(name)}" style="color:${isMatch?'var(--green)':'inherit'};">${statusLabel}</span>
+      <input type="text" placeholder="${inputPlaceholder}" value="${(inputValue||'').replace(/"/g,'&quot;')}" ${inputDisabled} oninput="checkAnswerHint('${escAttr(name)}', this.value)">
+      <span class="autochk" id="hint-${cssId(name)}" style="color:${isReveal&&isMatch?'var(--green)':'inherit'};">${statusLabel}</span>
       <button class="btn btn-small ${marked?'btn-gray':'btn-red'}" onclick="toggleWrong('${escAttr(name)}')">${marked? '되돌리기':'오답 처리'}</button>
     </div>`;
   }).join('');
@@ -580,6 +637,7 @@ function tryFinalizeTie(){
 function finishTieBreakWith(orderedNames){
   clearTbTimers();
   if(tbSubmissionsUnsub){ tbSubmissionsUnsub(); tbSubmissionsUnsub=null; }
+  if(tbPresenceUnsub){ tbPresenceUnsub(); tbPresenceUnsub=null; }
   // orderedNames: 그룹 내 등수 순서(1등→꼴찌) 이름 배열. currentList에서 해당 구간을 이 순서로 재배치.
   const { rangeStart, rangeEnd, original } = activeTie;
   const byName = {};
@@ -608,6 +666,7 @@ function finishTieBreakWith(orderedNames){
 function cancelTieBreak(){
   clearTbTimers();
   if(tbSubmissionsUnsub){ tbSubmissionsUnsub(); tbSubmissionsUnsub=null; }
+  if(tbPresenceUnsub){ tbPresenceUnsub(); tbPresenceUnsub=null; }
   activeTie = null;
   tbPhase = 'idle';
   set(tiebreakRef(), {active:false, updatedAt:Date.now()}).catch(e=>{});
@@ -617,6 +676,7 @@ function cancelTieBreak(){
 window.tryLogin = tryLogin;
 window.loadResults = loadResults;
 window.startTieBreak = startTieBreak;
+window.beginRound = beginRound;
 window.toggleWrong = toggleWrong;
 window.checkAnswerHint = checkAnswerHint;
 window.finishRound = finishRound;

@@ -128,6 +128,7 @@ let mySubmittedText = '';
 
 function normalizeAnswer(s){ return (s||'').replace(/\s+/g,'').trim(); }
 let tbUnsub = null; // 현재 sessionNum에 대한 tiebreak 구독 해제 함수
+let presenceSent = false; // 이번 결선에 접속 알림을 이미 보냈는지 여부
 
 function safeKey(name){ return (name||'').replace(/[.#$\[\]\/]/g,'_'); }
 
@@ -151,6 +152,7 @@ async function init(){
       const newSessionNum = snap.val().sessionNum;
       if(newSessionNum !== sessionNum || !tbUnsub){
         sessionNum = newSessionNum;
+        presenceSent = false; // 회차가 바뀌었으니 새로 참여 알림을 보내야 함
         if(joined) resubscribeTiebreak();
       }
     }
@@ -174,6 +176,16 @@ function tryJoin(){
   resubscribeTiebreak();
 }
 document.getElementById('name-input').addEventListener('keydown',(e)=>{ if(e.key==='Enter') tryJoin(); });
+
+async function sendPresence(){
+  if(presenceSent) return;
+  presenceSent = true;
+  try{
+    await set(ref(db, `sessions/session_${sessionNum}/tiebreak/presence/${safeKey(myName)}`), {
+      name: myName, joinedAt: Date.now()
+    });
+  }catch(e){ console.error('참여 알림 전송 오류:', e); presenceSent = false; }
+}
 
 function resubscribeTiebreak(){
   if(tbUnsub){ tbUnsub(); tbUnsub=null; }
@@ -199,6 +211,17 @@ function resubscribeTiebreak(){
       document.getElementById('login-error').classList.add('show');
       joined = false;
       showScreen('login-view');
+      return;
+    }
+
+    // 명단 확인이 끝났으면 진행자에게 접속 사실을 즉시 알림 (문제가 시작되기 전이어도 상관없음)
+    sendPresence();
+
+    // 진행자가 아직 참가자 접속 현황만 보고 있는 단계(로비) — 문제는 아직 시작 전
+    if(data.phase === 'lobby'){
+      if(tickInterval){ clearInterval(tickInterval); tickInterval=null; }
+      document.getElementById('waiting-name').textContent = `${myName} 님, 참여 완료! 진행자가 곧 문제를 시작합니다.`;
+      showScreen('waiting-view');
       return;
     }
 
