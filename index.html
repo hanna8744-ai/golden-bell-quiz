@@ -346,7 +346,8 @@
     <div id="admin-summary" class="info-grid" style="margin-bottom:14px;"></div>
     <div id="admin-top-scorer" class="rule-box" style="display:none;"></div>
     <div class="lb-tabs">
-      <button class="lb-tab active" id="admin-tab-all" onclick="renderAdminLB('all')">전체</button>
+      <button class="lb-tab active" id="admin-tab-participants" onclick="renderAdminLB('participants')">👥 참가자 명단</button>
+      <button class="lb-tab" id="admin-tab-all" onclick="renderAdminLB('all')">전체 결과</button>
       <button class="lb-tab" id="admin-tab-survivor" onclick="renderAdminLB('survivor')">🔔 생존자</button>
       <button class="lb-tab" id="admin-tab-elim" onclick="renderAdminLB('elim')">💀 탈락자</button>
     </div>
@@ -570,6 +571,7 @@ function updateSessionBadge(){
 const MAX_SESSIONS = 30;
 let adminSelectedSession = 1;
 let adminLB = [];
+let adminParticipants = [];
 
 function showAdminLogin(){
   document.getElementById('admin-login-confirm').classList.add('show');
@@ -618,9 +620,10 @@ async function loadAdminSession(){
   const listEl = document.getElementById('admin-lb-list');
   listEl.innerHTML='<div class="loading-box">불러오는 중...</div>';
   try{
-    const [metaSnap, lbSnap] = await Promise.all([
+    const [metaSnap, lbSnap, participantsSnap] = await Promise.all([
       get(ref(db, `sessions/session_${n}/meta`)),
-      get(ref(db, `sessions/session_${n}/leaderboard`))
+      get(ref(db, `sessions/session_${n}/leaderboard`)),
+      get(ref(db, `sessions/session_${n}/participants`))
     ]);
     const meta = metaSnap.exists() ? metaSnap.val() : {totalParticipants:0};
     adminLB = lbSnap.exists() ? Object.values(lbSnap.val()).filter(v=>v && v.name) : [];
@@ -629,16 +632,18 @@ async function loadAdminSession(){
       if(b.score!==a.score)return b.score-a.score;
       return b.qReached-a.qReached;
     });
+    adminParticipants = participantsSnap.exists() ? Object.values(participantsSnap.val()).filter(v=>v && v.name) : [];
+    adminParticipants.sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0));
 
     const survivors = adminLB.filter(e=>e.survived===1).length;
     const eliminated = adminLB.filter(e=>e.survived===0).length;
     const top = adminLB[0];
 
     document.getElementById('admin-summary').innerHTML = `
-      <div class="admin-summary-card"><div class="num">${meta.totalParticipants||0}</div><div class="label">참여자 수</div></div>
+      <div class="admin-summary-card"><div class="num">${adminParticipants.length || meta.totalParticipants||0}</div><div class="label">참여자 수</div></div>
       <div class="admin-summary-card"><div class="num">${survivors}</div><div class="label">🔔 골든벨 생존</div></div>
       <div class="admin-summary-card"><div class="num">${eliminated}</div><div class="label">💀 탈락</div></div>
-      <div class="admin-summary-card"><div class="num">${adminLB.length}</div><div class="label">기록된 참여자</div></div>
+      <div class="admin-summary-card"><div class="num">${adminLB.length}</div><div class="label">기록된 결과</div></div>
     `;
 
     const topBox = document.getElementById('admin-top-scorer');
@@ -648,10 +653,12 @@ async function loadAdminSession(){
         ${top.name} (${top.grade||'-'} ${top.dept||'-'}) · ${top.score}점 · ${top.survived? '골든벨 달성':`${top.stage}단계 ${top.qReached}번에서 탈락`}`;
     } else {
       topBox.style.display='block';
-      topBox.innerHTML = `아직 이 회차에 기록된 참여자가 없습니다.`;
+      topBox.innerHTML = adminParticipants.length
+        ? `${adminParticipants.length}명이 참가 등록했습니다. 아직 문제 풀이 결과는 없습니다 (진행 전이거나 진행 중).`
+        : `아직 이 회차에 등록된 참여자가 없습니다.`;
     }
 
-    renderAdminLB('all');
+    renderAdminLB('participants');
   } catch(e){
     console.error('관리자 회차 조회 오류:', e);
     listEl.innerHTML='<div class="empty-lb">데이터를 불러올 수 없습니다. Firebase 규칙/연결을 확인하세요.</div>';
@@ -659,14 +666,41 @@ async function loadAdminSession(){
 }
 
 function renderAdminLB(tab){
-  ['all','survivor','elim'].forEach(t=>{
+  ['participants','all','survivor','elim'].forEach(t=>{
     const el=document.getElementById('admin-tab-'+t);
     if(el) el.classList.toggle('active', t===tab);
   });
+  const el=document.getElementById('admin-lb-list');
+
+  if(tab==='participants'){
+    if(!adminParticipants.length){
+      el.innerHTML='<div class="empty-lb">아직 접속(등록)한 참가자가 없습니다. 학생들이 이름을 입력하고 &#39;골든벨 도전!&#39;을 누르면 여기에 즉시 표시됩니다.</div>';
+      return;
+    }
+    // 문제 풀이 결과(adminLB)와 이름·학년·과 기준으로 매칭해 현재 상태 표시
+    el.innerHTML = adminParticipants.map((p,i)=>{
+      const matched = adminLB.find(e=>e.name===p.name && e.grade===p.grade && e.dept===p.dept);
+      let statusHtml;
+      if(!matched){
+        statusHtml = `<span class="lbf-stage">🟢 대기/진행 중</span>`;
+      } else if(matched.survived){
+        statusHtml = `<span class="lbf-stage">🔔 골든벨 달성</span>`;
+      } else {
+        statusHtml = `<span class="lbf-stage">💀 ${matched.stage}단계 ${matched.qReached}번 탈락</span>`;
+      }
+      const gradeDeptParts = [p.grade, p.dept].filter(Boolean).join(' ');
+      return `<div class="lb-full-item rankN">
+        <span class="lbf-rank">${i+1}</span>
+        <span class="lbf-name">${p.name}${gradeDeptParts? ` · ${gradeDeptParts}`:''}</span>
+        ${statusHtml}
+      </div>`;
+    }).join('');
+    return;
+  }
+
   let list=adminLB;
   if(tab==='survivor')list=adminLB.filter(e=>e.survived===1);
   if(tab==='elim')list=adminLB.filter(e=>e.survived===0);
-  const el=document.getElementById('admin-lb-list');
   if(!list.length){el.innerHTML='<div class="empty-lb">해당 조건의 기록이 없습니다.</div>';return;}
   const medals=['🥇','🥈','🥉'];
   const rc=i=>i===0?'rank1':i===1?'rank2':i===2?'rank3':'rankN';

@@ -778,11 +778,25 @@ async function startGame(){
   if(!playerName || !selectedGrade || !selectedDept) return;
   totalParticipants++;
   await saveGlobalMeta();
+  await saveParticipantEntry(); // 문제를 풀기 전, 접속 시점에 참가자 정보를 즉시 기록 (관리자 페이지에서 사전 확인용)
   playerState='alive';
   lastRenderedGQ=-2;
   currentStage=0; currentQ=0; score=0; stageScores=[0,0,0,0,0];
   showScreen('waiting-screen');
   attachControlListener();
+}
+
+// ── 참가자 등록 정보 저장 (리더보드와 별개로, 접속만 해도 즉시 기록됨) ──
+async function saveParticipantEntry(){
+  try{
+    const key = playerName + '_' + Date.now();
+    await set(ref(db, `sessions/session_${sessionNum}/participants/${key}`), {
+      name: playerName,
+      grade: selectedGrade,
+      dept: selectedDept,
+      joinedAt: Date.now()
+    });
+  }catch(e){ console.error('참가자 등록 정보 저장 오류:', e); }
 }
 
 // ── 진행자 실시간 진행 상태 구독 (참가자용) ──
@@ -1019,11 +1033,12 @@ function selectAnswer(val,btn){
   } else {
     fb.className='feedback-box wrong show';
     fb.innerHTML=`❌ <strong>오답!</strong> 정답: ${getCorrectText(s,q)}<br>${q.exp}<br><span class="page-ref">${q.page}</span>`;
+    recordElimination(false,q.q); // 버튼 클릭과 무관하게 즉시 탈락 처리
     const nb=document.getElementById('btn-next-q');
     nb.className='btn-next-q show';
     nb.style.background='#dc2626';
     nb.textContent='💀 탈락 결과 확인';
-    nb.onclick=()=>eliminatePlayer(false,q.q);
+    nb.onclick=()=>showElimScreen();
   }
 }
 
@@ -1043,11 +1058,12 @@ function timeoutQ(){
   const fb=document.getElementById('feedback-box');
   fb.className='feedback-box timeout show';
   fb.innerHTML=`⏰ <strong>시간 초과!</strong> 정답: ${getCorrectText(s,q)}<br>${q.exp}<br><span class="page-ref">${q.page}</span>`;
+  recordElimination(true,q.q); // 버튼 클릭과 무관하게 즉시 탈락 처리
   const nb=document.getElementById('btn-next-q');
   nb.className='btn-next-q show';
   nb.style.background='#dc2626';
   nb.textContent='💀 탈락 결과 확인';
-  nb.onclick=()=>eliminatePlayer(true,q.q);
+  nb.onclick=()=>showElimScreen();
 }
 
 function highlightOptions(s,q,val,isCorrect){
@@ -1072,7 +1088,12 @@ function globalQNum(){
 }
 
 // ── ELIMINATION ──
-async function eliminatePlayer(isTimeout, wrongQ){
+// 1단계: 참가자가 버튼을 누르든 안 누르든, 오답/시간초과 즉시 실행되어 Firebase에 탈락으로 기록
+let pendingElimInfo = null;
+let pendingElimEntry = null;
+
+async function recordElimination(isTimeout, wrongQ){
+  if(playerState==='eliminated') return; // 중복 기록 방지
   playerState='eliminated';
   const qNum=globalQNum();
   const entry={
@@ -1080,14 +1101,23 @@ async function eliminatePlayer(isTimeout, wrongQ){
     stage:STAGES[currentStage].id, reason:isTimeout?'시간초과':'오답',
     time:Date.now()
   };
+  pendingElimInfo = {isTimeout, wrongQ, qNum, stageId:STAGES[currentStage].id, qIdx:currentQ};
   await saveLBEntry(entry);
+  pendingElimEntry = entry;
+}
+
+// 2단계: 참가자가 '탈락 결과 확인' 버튼을 누르면 탈락 화면으로 전환 (본인이 볼 때만 필요한 화면 전환)
+function showElimScreen(){
+  const entry = pendingElimEntry;
+  const info = pendingElimInfo;
+  if(!entry || !info) return; // 안전장치: 기록이 아직 안 끝났으면 무시
 
   const rank = leaderboard.findIndex(e=>e.name===entry.name&&e.time===entry.time)+1;
   document.getElementById('elim-sub').textContent=`${playerName} 님, 아쉽게도 탈락했습니다.`;
   document.getElementById('elim-q').innerHTML=
-    `<strong>${isTimeout?'⏰ 시간 초과':'❌ 오답'}</strong> — ${STAGES[currentStage].id}단계 ${currentQ+1}번 (전체 ${qNum}번)<br>"${wrongQ}"`;
+    `<strong>${info.isTimeout?'⏰ 시간 초과':'❌ 오답'}</strong> — ${info.stageId}단계 ${info.qIdx+1}번 (전체 ${info.qNum}번)<br>"${info.wrongQ}"`;
   document.getElementById('elim-rank-num').textContent=`${rank}위`;
-  document.getElementById('elim-score-disp').textContent=`획득 점수: ${score}점 · 전체 ${qNum}번까지 진행`;
+  document.getElementById('elim-score-disp').textContent=`획득 점수: ${score}점 · 전체 ${info.qNum}번까지 진행`;
 
   history.pushState(null,null,location.href);
   window.onpopstate=()=>{ history.pushState(null,null,location.href); };
