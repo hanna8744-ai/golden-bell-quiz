@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>동점자 결선 - 참가자</title>
+<style>
+  :root{--gold:#FFD700;--dark-gold:#B8860B;--navy:#1a2744;--blue:#2563eb;--green:#16a34a;--red:#dc2626;--gray:#64748b;--teal:#0f766e;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#1a2744 0%,#0f766e 100%);min-height:100vh;color:#222;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .card{background:rgba(255,255,255,0.98);border-radius:22px;padding:30px 26px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;}
+  h1{font-size:1.35rem;font-weight:900;color:var(--navy);margin-bottom:6px;}
+  .sub{color:var(--gray);font-size:0.85rem;margin-bottom:18px;line-height:1.6;}
+  .name-input{width:100%;padding:13px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;outline:none;margin-bottom:12px;text-align:center;}
+  .name-input:focus{border-color:var(--teal);}
+  .btn{width:100%;padding:14px;border:none;border-radius:14px;font-size:1rem;font-weight:800;cursor:pointer;color:white;background:linear-gradient(135deg,var(--teal),#0d5c56);}
+  .btn:hover{opacity:0.92;}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .error-msg{background:#fef2f2;border:2px solid #fca5a5;color:#991b1b;border-radius:10px;padding:10px 14px;font-size:0.83rem;margin-bottom:12px;display:none;text-align:left;}
+  .error-msg.show{display:block;}
+  .hidden{display:none !important;}
+  .bell{font-size:56px;display:block;margin-bottom:6px;}
+  .badge{display:inline-block;background:#e0f2fe;color:#0369a1;border-radius:20px;padding:4px 14px;font-size:0.75rem;font-weight:700;margin-bottom:14px;}
+  .qnum{font-size:0.8rem;color:var(--teal);font-weight:800;margin-bottom:8px;}
+  .qtext{font-weight:700;color:var(--navy);font-size:1.08rem;line-height:1.6;margin-bottom:16px;text-align:left;background:#f8fafc;border-radius:12px;padding:14px;border-left:4px solid var(--teal);}
+  .timer{font-size:3rem;font-weight:900;color:var(--teal);margin-bottom:14px;font-variant-numeric:tabular-nums;}
+  .timer.warn{color:#ca8a04;}
+  .timer.danger{color:var(--red);}
+  .status-box{background:#f0fdf4;border:2px solid #86efac;color:#166534;border-radius:12px;padding:12px 14px;font-size:0.88rem;font-weight:700;margin-top:10px;}
+  .elim-box{background:#fef2f2;border:2px solid #fca5a5;color:#991b1b;border-radius:12px;padding:14px;font-size:0.9rem;line-height:1.6;}
+  .reveal-box{background:#f0fdf4;border:2px solid #86efac;border-radius:12px;padding:14px;text-align:left;margin-bottom:14px;}
+  .reveal-box .accepted{color:#166534;font-weight:800;font-size:0.92rem;margin-bottom:6px;}
+  .reveal-box .exp{font-size:0.83rem;color:#444;}
+  .waiting-pulse{animation:pulse 1.6s ease-in-out infinite;color:var(--gray);font-size:0.9rem;font-weight:700;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+</style>
+</head>
+<body>
+
+<div class="card" id="login-view">
+  <span class="bell">🏅</span>
+  <h1>동점자 결선</h1>
+  <p class="sub">동점자로 지목된 학생만 참여할 수 있어요.<br>본인 이름을 정확히 입력해주세요.</p>
+  <div class="error-msg" id="login-error"></div>
+  <input type="text" id="name-input" class="name-input" placeholder="이름 입력 (예: 홍길동)">
+  <button class="btn" id="btn-join" onclick="tryJoin()">✅ 결선 참여하기</button>
+</div>
+
+<div class="card hidden" id="waiting-view">
+  <span class="bell">⏳</span>
+  <h1>진행자를 기다리는 중...</h1>
+  <p class="sub">진행자가 동점자 결선을 시작하면 화면이 자동으로 전환됩니다.</p>
+  <div class="waiting-pulse" id="waiting-name"></div>
+</div>
+
+<div class="card hidden" id="quiz-view">
+  <div class="badge" id="quiz-badge">동점자 결선</div>
+  <div class="qnum" id="quiz-qnum"></div>
+  <div class="qtext" id="quiz-qtext"></div>
+  <div id="active-block">
+    <div class="timer" id="quiz-timer">30</div>
+    <input type="text" id="answer-input" class="name-input" placeholder="정답 입력">
+    <button class="btn" id="btn-submit" onclick="submitAnswer()">📝 제출하기</button>
+    <div class="status-box hidden" id="submitted-status">✅ 제출 완료! 진행자가 확인 중입니다.</div>
+  </div>
+  <div id="reveal-block" class="hidden">
+    <div class="reveal-box">
+      <div class="accepted" id="reveal-accepted"></div>
+      <div class="exp" id="reveal-exp"></div>
+    </div>
+    <div class="waiting-pulse" id="reveal-status">진행자가 다음 문제를 준비 중입니다...</div>
+  </div>
+</div>
+
+<div class="card hidden" id="elim-view">
+  <span class="bell">💀</span>
+  <h1>탈락</h1>
+  <div class="elim-box">
+    아쉽게도 이번 동점자 결선에서 탈락했습니다.<br>
+    최종 순위는 진행자가 발표할 예정이에요. 수고하셨습니다!
+  </div>
+</div>
+
+<div class="card hidden" id="done-view">
+  <span class="bell">🎉</span>
+  <h1>결선 종료</h1>
+  <p class="sub">동점자 결선이 종료됐어요. 최종 순위는 진행자가 발표합니다. 수고하셨습니다!</p>
+</div>
+
+<script src="tiebreak-questions.js"></script>
+
+<!-- 폴백: 아래 모듈 스크립트(Firebase) 로딩이 실패해도 버튼 클릭 시 안내 메시지가 뜨도록 기본 함수 정의 -->
+<script>
+(function(){
+  const FALLBACK_MSG = '⚠️ 앱 로딩에 실패했습니다.\n\n원인일 가능성이 높은 것들:\n· 이 파일을 더블클릭(file://)으로 직접 열었을 수 있습니다 → 웹서버(GitHub Pages 등)로 열어주세요.\n· 인터넷 연결이 끊겼거나 광고 차단 확장 프로그램이 Firebase 스크립트를 막았을 수 있습니다.\n\nF12 콘솔에서 빨간색 에러 메시지를 확인해주세요.';
+  const names = ['tryJoin','submitAnswer'];
+  names.forEach(n=>{ window[n] = function(){ alert(FALLBACK_MSG); }; });
+})();
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBT8yXBaLulPjQGgv_wiDyRhcM4LC1CgE8",
+  authDomain: "golden-bell-quiz.firebaseapp.com",
+  databaseURL: "https://golden-bell-quiz-default-rtdb.firebaseio.com",
+  projectId: "golden-bell-quiz",
+  storageBucket: "golden-bell-quiz.firebasestorage.app",
+  messagingSenderId: "544242063266",
+  appId: "1:544242063266:web:bbb221a1660f088d1ac4fb"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const BONUS_TIME = 30;
+const BONUS_QUESTIONS = window.TIEBREAK_QUESTIONS;
+
+let sessionNum = 1;
+let myName = '';
+let joined = false;
+let eliminated = false;
+let lastState = null; // 마지막으로 처리한 {phase, questionIndex} 조합 (중복 처리 방지)
+let tickInterval = null;
+let answered = false;
+
+function safeKey(name){ return (name||'').replace(/[.#$\[\]\/]/g,'_'); }
+
+function showScreen(id){
+  ['login-view','waiting-view','quiz-view','elim-view','done-view'].forEach(v=>{
+    document.getElementById(v).classList.toggle('hidden', v!==id);
+  });
+}
+
+async function init(){
+  try{
+    const snap = await get(ref(db,'global_meta'));
+    if(snap.exists()) sessionNum = snap.val().sessionNum || 1;
+  }catch(e){ console.error('세션 정보 조회 오류:', e); }
+}
+init();
+
+function tryJoin(){
+  const name = document.getElementById('name-input').value.trim();
+  const errBox = document.getElementById('login-error');
+  if(!name){
+    errBox.textContent = '이름을 입력해주세요.';
+    errBox.classList.add('show');
+    return;
+  }
+  errBox.classList.remove('show');
+  myName = name;
+  document.getElementById('waiting-name').textContent = `${myName} 님, 대기 중...`;
+  joined = true;
+  showScreen('waiting-view');
+  watchTiebreak();
+}
+document.getElementById('name-input').addEventListener('keydown',(e)=>{ if(e.key==='Enter') tryJoin(); });
+
+function watchTiebreak(){
+  onValue(ref(db, `sessions/session_${sessionNum}/tiebreak`), (snap)=>{
+    if(!joined || eliminated) return;
+    const data = snap.exists() ? snap.val() : null;
+    if(!data || !data.active){
+      // 결선이 아직 시작 안 했거나(대기) / 이미 완전히 끝났으면(done)
+      if(lastState && lastState.everActive){
+        showScreen('done-view');
+      } else {
+        showScreen('waiting-view');
+      }
+      return;
+    }
+    lastState = lastState || {};
+    lastState.everActive = true;
+
+    const groupNames = data.groupNames || [];
+    if(!groupNames.includes(myName)){
+      document.getElementById('login-error').textContent = '⚠️ 동점자 결선 대상자 명단에서 이름을 찾을 수 없어요. 이름을 다시 확인해주세요.';
+      document.getElementById('login-error').classList.add('show');
+      joined = false;
+      showScreen('login-view');
+      return;
+    }
+
+    const activeNames = data.activeNames || [];
+    if(!activeNames.includes(myName)){
+      eliminated = true;
+      if(tickInterval){ clearInterval(tickInterval); tickInterval=null; }
+      showScreen('elim-view');
+      return;
+    }
+
+    const key = data.phase + ':' + data.questionIndex;
+    const isNewState = !lastState || lastState.key !== key;
+    lastState.key = key;
+
+    if(isNewState && data.phase==='active'){
+      answered = false;
+    }
+    renderQuiz(data, isNewState);
+  }, (err)=>{ console.error('동점자 진행 상태 조회 오류:', err); });
+}
+
+function renderQuiz(data, isNewState){
+  showScreen('quiz-view');
+  const q = BONUS_QUESTIONS[data.questionIndex];
+  if(!q) return;
+  document.getElementById('quiz-qnum').textContent = `보너스 문제 ${data.questionIndex+1} / ${BONUS_QUESTIONS.length} · ${activeCountText(data)}`;
+  document.getElementById('quiz-qtext').textContent = q.q;
+
+  const activeBlock = document.getElementById('active-block');
+  const revealBlock = document.getElementById('reveal-block');
+
+  if(data.phase==='reveal'){
+    activeBlock.classList.add('hidden');
+    revealBlock.classList.remove('hidden');
+    document.getElementById('reveal-accepted').textContent = '✅ 정답 인정: ' + q.answers.join(' / ');
+    document.getElementById('reveal-exp').textContent = q.exp;
+    if(tickInterval){ clearInterval(tickInterval); tickInterval=null; }
+    return;
+  }
+
+  // phase === 'active'
+  revealBlock.classList.add('hidden');
+  activeBlock.classList.remove('hidden');
+
+  if(isNewState){
+    document.getElementById('answer-input').value = '';
+    document.getElementById('answer-input').disabled = false;
+    document.getElementById('btn-submit').disabled = false;
+    document.getElementById('submitted-status').classList.add('hidden');
+  }
+
+  if(tickInterval){ clearInterval(tickInterval); tickInterval=null; }
+  const tick = ()=>{
+    const remaining = Math.max(0, Math.ceil(BONUS_TIME - (Date.now()-data.startTime)/1000));
+    const el = document.getElementById('quiz-timer');
+    if(el){
+      el.textContent = remaining;
+      el.className = 'timer' + (remaining<=5?' danger':remaining<=10?' warn':'');
+    }
+    if(remaining<=0){
+      lockAnswerInput();
+      clearInterval(tickInterval); tickInterval=null;
+    }
+  };
+  tick();
+  tickInterval = setInterval(tick, 250);
+}
+
+function activeCountText(data){
+  const n = (data.activeNames||[]).length;
+  return `${n}명 대결 중`;
+}
+
+function lockAnswerInput(){
+  document.getElementById('answer-input').disabled = true;
+  document.getElementById('btn-submit').disabled = true;
+  if(!answered){
+    document.getElementById('submitted-status').textContent = '⏰ 시간이 종료됐어요.';
+    document.getElementById('submitted-status').classList.remove('hidden');
+  }
+}
+
+async function submitAnswer(){
+  if(answered) return;
+  const val = document.getElementById('answer-input').value.trim();
+  if(!val) return;
+  answered = true;
+  document.getElementById('answer-input').disabled = true;
+  document.getElementById('btn-submit').disabled = true;
+  document.getElementById('submitted-status').textContent = '✅ 제출 완료! 진행자가 확인 중입니다.';
+  document.getElementById('submitted-status').classList.remove('hidden');
+  try{
+    // 현재 문제 인덱스를 다시 조회해서 정확한 경로에 저장
+    const snap = await get(ref(db, `sessions/session_${sessionNum}/tiebreak`));
+    const qIdx = snap.exists() ? snap.val().questionIndex : 0;
+    await set(ref(db, `sessions/session_${sessionNum}/tiebreak/submissions/${qIdx}/${safeKey(myName)}`), {
+      text: val, submittedAt: Date.now()
+    });
+  }catch(e){ console.error('답변 제출 오류:', e); }
+}
+document.getElementById('answer-input')?.addEventListener('keydown',(e)=>{ if(e.key==='Enter') submitAnswer(); });
+
+window.tryJoin = tryJoin;
+window.submitAnswer = submitAnswer;
+</script>
+</body>
+</html>
