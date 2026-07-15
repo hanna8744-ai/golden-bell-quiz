@@ -64,6 +64,7 @@
     <div class="status-box hidden" id="submitted-status">✅ 제출 완료! 진행자가 확인 중입니다.</div>
   </div>
   <div id="reveal-block" class="hidden">
+    <div id="my-result" style="font-weight:800;font-size:0.95rem;margin-bottom:10px;"></div>
     <div class="reveal-box">
       <div class="accepted" id="reveal-accepted"></div>
       <div class="exp" id="reveal-exp"></div>
@@ -123,6 +124,9 @@ let eliminated = false;
 let lastState = null; // 마지막으로 처리한 {phase, questionIndex} 조합 (중복 처리 방지)
 let tickInterval = null;
 let answered = false;
+let mySubmittedText = '';
+
+function normalizeAnswer(s){ return (s||'').replace(/\s+/g,'').trim(); }
 let tbUnsub = null; // 현재 sessionNum에 대한 tiebreak 구독 해제 함수
 
 function safeKey(name){ return (name||'').replace(/[.#$\[\]\/]/g,'_'); }
@@ -212,6 +216,7 @@ function resubscribeTiebreak(){
 
     if(isNewState && data.phase==='active'){
       answered = false;
+      mySubmittedText = '';
     }
     renderQuiz(data, isNewState);
   }, (err)=>{ console.error('동점자 진행 상태 조회 오류:', err); });
@@ -232,6 +237,20 @@ function renderQuiz(data, isNewState){
     revealBlock.classList.remove('hidden');
     document.getElementById('reveal-accepted').textContent = '✅ 정답 인정: ' + q.answers.join(' / ');
     document.getElementById('reveal-exp').textContent = q.exp;
+    const myResultEl = document.getElementById('my-result');
+    if(myResultEl){
+      const isMatch = mySubmittedText && q.answers.some(a=>normalizeAnswer(a)===normalizeAnswer(mySubmittedText));
+      if(!mySubmittedText){
+        myResultEl.textContent = '⏰ 시간 내에 답을 제출하지 못했어요.';
+        myResultEl.style.color = 'var(--red)';
+      } else if(isMatch){
+        myResultEl.textContent = `✅ 내 답변 "${mySubmittedText}" — 정답이에요!`;
+        myResultEl.style.color = 'var(--green)';
+      } else {
+        myResultEl.textContent = `❌ 내 답변 "${mySubmittedText}" — 오답이에요.`;
+        myResultEl.style.color = 'var(--red)';
+      }
+    }
     if(tickInterval){ clearInterval(tickInterval); tickInterval=null; }
     return;
   }
@@ -283,6 +302,7 @@ async function submitAnswer(){
   const val = document.getElementById('answer-input').value.trim();
   if(!val) return;
   answered = true;
+  mySubmittedText = val;
   document.getElementById('answer-input').disabled = true;
   document.getElementById('btn-submit').disabled = true;
   document.getElementById('submitted-status').textContent = '✅ 제출 완료! 진행자가 확인 중입니다.';

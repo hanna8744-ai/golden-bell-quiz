@@ -372,9 +372,26 @@ function scheduleReveal(){
   tbRevealTimeout = setTimeout(()=>{
     if(!activeTie || globalQPointer!==capturedQ) return;
     tbPhase = 'reveal';
+    autoGradeRound();
     writeTbState();
     renderTieBreak();
   }, BONUS_TIME*1000);
+}
+
+// ── 제출된 답변을 정답 인정 범위와 자동 비교해서 채점 ──
+// 정답 인정 범위와 일치하면 그대로 생존, 불일치하거나 아예 제출하지 않았으면 자동으로 오답 처리(markedWrong에 추가)
+// 진행자가 화면에서 직접 '되돌리기'를 눌러 언제든 덮어쓸 수 있음
+function autoGradeRound(){
+  const q = BONUS_QUESTIONS[globalQPointer];
+  if(!q) return;
+  activeTie.active.forEach(name=>{
+    const submission = tbLiveSubmissions[safeKey(name)];
+    const text = submission ? submission.text : '';
+    const isCorrect = !!text && q.answers.some(a=>normalizeAnswer(a)===normalizeAnswer(text));
+    if(!isCorrect){
+      activeTie.markedWrong.add(name);
+    }
+  });
 }
 
 async function writeTbState(){
@@ -424,23 +441,30 @@ function renderTieBreak(){
     const submitted = tbLiveSubmissions[safeKey(name)];
     const submittedText = submitted ? submitted.text : '';
     const isMatch = submittedText && q.answers.some(a=>normalizeAnswer(a)===normalizeAnswer(submittedText));
+    let statusLabel = '';
+    if(isReveal){
+      statusLabel = marked ? (submittedText? '❌ 오답(자동)':'❌ 미제출(자동)') : '✅ 정답(자동)';
+    } else if(submittedText){
+      statusLabel = isMatch ? '✅ 일치' : '제출됨';
+    }
     return `<div class="roster-item ${marked?'marked-wrong':''}" id="roster-${cssId(name)}">
       <span class="rname">${name}</span>
       <input type="text" placeholder="답변 입력(참가자 미접속 시 대신 입력)" value="${(submittedText||'').replace(/"/g,'&quot;')}" oninput="checkAnswerHint('${escAttr(name)}', this.value)">
-      <span class="autochk" id="hint-${cssId(name)}" style="color:${isMatch?'var(--green)':'inherit'};">${submittedText? (isMatch?'✅ 일치':'제출됨') : ''}</span>
+      <span class="autochk" id="hint-${cssId(name)}" style="color:${isMatch?'var(--green)':'inherit'};">${statusLabel}</span>
       <button class="btn btn-small ${marked?'btn-gray':'btn-red'}" onclick="toggleWrong('${escAttr(name)}')">${marked? '되돌리기':'오답 처리'}</button>
     </div>`;
   }).join('');
 
   const qboxInner = isReveal
-    ? `<div class="qnum">보너스 문제 ${globalQPointer+1} / ${BONUS_QUESTIONS.length} · ✅ 정답 공개</div>
+    ? `<div class="qnum">보너스 문제 ${globalQPointer+1} / ${BONUS_QUESTIONS.length} · ✅ 정답 공개 (자동 채점 완료)</div>
        <div class="qtext">${q.q}</div>
        <span class="accepted">✅ 정답 인정: ${q.answers.join(' / ')}</span>
-       <div style="font-size:0.8rem;color:#666;margin-top:6px;">💡 ${q.exp} <span style="color:#94a3b8;">(${q.page})</span></div>`
+       <div style="font-size:0.8rem;color:#666;margin-top:6px;">💡 ${q.exp} <span style="color:#94a3b8;">(${q.page})</span></div>
+       <div style="font-size:0.76rem;color:#166534;margin-top:8px;">🤖 제출된 답변을 정답 인정 범위와 자동으로 비교해서 채점했어요. 잘못 채점된 사람이 있으면 아래에서 '되돌리기'로 직접 수정할 수 있어요.</div>`
     : `<div class="qnum">보너스 문제 ${globalQPointer+1} / ${BONUS_QUESTIONS.length} · ⏱ 풀이 중</div>
        <div class="qtext">${q.q}</div>
        <div id="tb-timer" style="text-align:center;font-size:2.6rem;font-weight:900;color:var(--teal);margin-top:6px;">${Math.max(0,Math.ceil(BONUS_TIME-(Date.now()-tbStartTime)/1000))}</div>
-       <div style="font-size:0.78rem;color:#94a3b8;text-align:center;margin-top:2px;">30초 후 자동으로 정답이 공개됩니다</div>`;
+       <div style="font-size:0.78rem;color:#94a3b8;text-align:center;margin-top:2px;">30초 후 자동으로 정답이 공개되고, 제출된 답변이 자동 채점됩니다</div>`;
 
   area.innerHTML = `<h2>🏁 동점자 결선 진행 중 (${activeTie.active.length}명 남음)</h2>
     <div class="qbox">${qboxInner}</div>
@@ -530,6 +554,8 @@ function finalizeManualOrder(){
 }
 
 function tryFinalizeTie(){
+  // 강제 확정이라도 제출된 답변 기준으로 먼저 자동 채점
+  autoGradeRound();
   // 아직 마킹 안 하고 남아있는 문제 도중이면, 현재까지의 마킹을 이번 라운드로 반영 후 확정
   if(activeTie.markedWrong.size>0){
     const eliminated = Array.from(activeTie.markedWrong);
