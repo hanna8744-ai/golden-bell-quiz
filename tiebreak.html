@@ -99,7 +99,7 @@
 <script>
 (function(){
   const FALLBACK_MSG = '⚠️ 앱 로딩에 실패했습니다.\n\n원인일 가능성이 높은 것들:\n· 이 파일을 더블클릭(file://)으로 직접 열었을 수 있습니다 → 웹서버(GitHub Pages 등)로 열어주세요.\n· 인터넷 연결이 끊겼거나 광고 차단 확장 프로그램이 Firebase 스크립트를 막았을 수 있습니다.\n\nF12 콘솔에서 빨간색 에러 메시지를 확인해주세요.';
-  const names = ['tryLogin','loadResults','startTieBreak','toggleWrong','checkAnswerHint','finishRound','tryFinalizeTie','cancelTieBreak','moveManual','finalizeManualOrder','copyFinalRanking'];
+  const names = ['tryLogin','loadResults','startTieBreak','resumeTieBreak','resetTieBreak','beginRound','toggleWrong','checkAnswerHint','finishRound','tryFinalizeTie','cancelTieBreak','moveManual','finalizeManualOrder','copyFinalRanking'];
   names.forEach(n=>{ window[n] = function(){ alert(FALLBACK_MSG); }; });
 })();
 </script>
@@ -139,6 +139,7 @@ let sessionNum = 1;
 let currentList = [];      // 정렬된 leaderboard entries (동점 해소되면서 계속 갱신됨)
 let globalQPointer = 0;    // 동점자 문제 은행 포인터 (전체 세션 통틀어 재사용 방지)
 let activeTie = null;      // 현재 진행 중인 tie-break 세션 상태
+let existingTbState = null; // Firebase에 남아있는 이전 진행 상태 (이어하기용)
 let resolvedCounter = 0;   // 동점자 확정 순서에 부여하는 전역 유일 번호 (재탐지 방지용)
 
 // ── 참가자용(tiebreak-live.html) 실시간 동기화 ──
@@ -153,7 +154,7 @@ let tbPresenceUnsub = null;
 let tbPresence = {}; // {safeKey(name): {name, joinedAt}} - 참가자가 tiebreak-live.html에 접속했는지 여부
 let tbLiveSubmissions = {}; // {name: {text, submittedAt}} - 현재 문제에 대한 참가자 실시간 제출 답변
 
-function safeKey(name){ return (name||'').replace(/[.#$\[\]\/]/g,'_'); }
+function safeKey(name){ return (name||'').normalize('NFC').trim().replace(/[.#$\[\]\/]/g,'_'); }
 
 function tryLogin(){
   const pw = document.getElementById('login-pw-input').value;
@@ -257,6 +258,11 @@ async function loadResults(){
       errBox.textContent = `⚠️ 참고: 기록된 인원(${list.length}명)이 전체 시상 인원(${TOTAL_PRIZES}명)보다 적어요. 마지막 등수 일부는 인원이 부족한 채로 표시돼요.`;
       errBox.classList.add('show');
     }
+    // 진행 중이던 동점자 결선이 있는지 확인 (진행자 페이지가 새로고침 등으로 초기화됐을 때 이어하기 지원)
+    try{
+      const tbSnap = await get(tiebreakRef());
+      existingTbState = (tbSnap.exists() && tbSnap.val() && tbSnap.val().active) ? tbSnap.val() : null;
+    }catch(e){ existingTbState = null; }
     renderResults();
   }catch(e){
     console.error('결과 조회 오류:', e);
@@ -282,11 +288,19 @@ function renderResults(){
     </div>`;
   });
   if(tieIssue){
+    const tieNames = tieIssue.members.map(m=>m.name);
+    const hasResumable = existingTbState && arraysEqualAsSets(existingTbState.groupNames||[], tieNames);
     html += `<div class="tier-block warn">
       <div class="tier-head"><div class="tier-title">⚠ 동점자 결선 필요</div></div>
       <div class="tie-alert">${tieIssue.members.length}명이 동점으로 묶여 있어서, 이 지점의 등수를 정확히 나눌 수 없어요.</div>
       <div>${tieIssue.members.map(m=>`<span class="member-chip">${m.name}<span class="pts">${m.score}점</span></span>`).join('')}</div>
-      <button class="btn btn-red" style="margin-top:10px;" onclick="startTieBreak()">🏁 이 그룹으로 동점자 퀴즈 시작</button>
+      ${hasResumable ? `
+        <div class="tie-alert" style="color:#0369a1;margin-top:10px;">💾 진행 중이던 동점자 결선 기록을 찾았어요. 이어서 진행할 수 있어요.</div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-gold" onclick="resumeTieBreak()">▶ 이어하기</button>
+          <button class="btn btn-red" onclick="startTieBreak()">🔄 처음부터 다시 시작</button>
+        </div>
+      ` : `<button class="btn btn-red" style="margin-top:10px;" onclick="startTieBreak()">🏁 이 그룹으로 동점자 퀴즈 시작</button>`}
     </div>`;
   }
   html += '</div>';
@@ -297,6 +311,12 @@ function renderResults(){
   } else {
     document.getElementById('final-area').classList.add('hidden');
   }
+}
+
+function arraysEqualAsSets(a, b){
+  if(a.length !== b.length) return false;
+  const sa = new Set(a);
+  return b.every(x=>sa.has(x));
 }
 
 function renderFinalRanking(tiers){
@@ -341,9 +361,55 @@ function startTieBreak(){
     rounds: [],                       // [{qIndex, eliminated:[names]}]
     markedWrong: new Set(),
   };
+  existingTbState = null;
   document.getElementById('tiebreak-area').classList.remove('hidden');
   document.getElementById('tiebreak-area').scrollIntoView({behavior:'smooth'});
   enterLobby();
+}
+
+// ── 이어하기: 진행자 페이지가 새로고침 등으로 초기화됐어도 Firebase에 남은 진행 상태로 복원 ──
+function resumeTieBreak(){
+  const { tieIssue } = sliceTiers(currentList);
+  if(!tieIssue || !existingTbState) return;
+  const state = existingTbState;
+  activeTie = {
+    rangeStart: tieIssue.rangeStart,
+    rangeEnd: tieIssue.rangeEnd,
+    original: tieIssue.members,
+    active: (state.activeNames && state.activeNames.length) ? state.activeNames.slice() : tieIssue.members.map(m=>m.name),
+    rounds: state.roundsHistory ? state.roundsHistory.slice() : [],
+    markedWrong: new Set(),
+  };
+  globalQPointer = state.questionIndex || 0;
+  tbStartTime = state.startTime || null;
+
+  document.getElementById('tiebreak-area').classList.remove('hidden');
+  document.getElementById('tiebreak-area').scrollIntoView({behavior:'smooth'});
+
+  if(state.phase === 'lobby'){
+    tbPhase = 'lobby';
+    tbPresence = {};
+    watchPresence();
+    renderTieBreak();
+  } else if(state.phase === 'reveal'){
+    tbPhase = 'reveal';
+    watchSubmissions();
+    renderTieBreak();
+  } else {
+    // active로 복원: 이미 30초가 다 지났으면 바로 정답 공개, 아니면 남은 시간만큼만 재예약
+    tbPhase = 'active';
+    watchSubmissions();
+    const elapsed = tbStartTime ? (Date.now() - tbStartTime) / 1000 : BONUS_TIME;
+    if(elapsed >= BONUS_TIME){
+      tbPhase = 'reveal';
+      autoGradeRound();
+      writeTbState();
+      renderTieBreak();
+    } else {
+      scheduleReveal();
+      renderTieBreak();
+    }
+  }
 }
 
 // ── 로비: 문제를 내기 전에 동점자들이 tiebreak-live.html에 잘 접속했는지 먼저 확인 ──
@@ -383,6 +449,7 @@ function renderLobby(){
     <div>${rows}</div>
     <div class="row" style="margin-top:14px;">
       <button class="btn btn-gold" onclick="beginRound()">▶ 문제 풀이 시작${allJoined?'':' (아직 전원 접속 전)'}</button>
+      <button class="btn btn-red" onclick="resetTieBreak()">🔄 리셋</button>
       <button class="btn btn-gray" onclick="cancelTieBreak()">취소</button>
     </div>`;
 }
@@ -406,6 +473,8 @@ function clearTbTimers(){
 
 function scheduleReveal(){
   const capturedQ = globalQPointer;
+  const elapsedMs = tbStartTime ? (Date.now() - tbStartTime) : 0;
+  const remainingMs = Math.max(0, BONUS_TIME*1000 - elapsedMs); // 이어하기 시 이미 지난 시간만큼 제외
   tbTickInterval = setInterval(()=>{
     const el = document.getElementById('tb-timer');
     if(!el || !activeTie || tbPhase!=='active') return;
@@ -418,7 +487,7 @@ function scheduleReveal(){
     autoGradeRound();
     writeTbState();
     renderTieBreak();
-  }, BONUS_TIME*1000);
+  }, remainingMs);
 }
 
 // ── 제출된 답변을 정답 인정 범위와 자동 비교해서 채점 ──
@@ -448,6 +517,7 @@ async function writeTbState(){
         phase: tbPhase,
         questionIndex: globalQPointer,
         startTime: tbStartTime,
+        roundsHistory: activeTie.rounds, // 이어하기를 위해 라운드별 탈락 기록도 저장
         updatedAt: Date.now()
       }),
       // 참가자 페이지가 "지금 진행자가 실제로 진행 중인 회차"를 정확히 따라가도록
@@ -529,6 +599,7 @@ function renderTieBreak(){
     <div class="row" style="margin-top:12px;">
       <button class="btn" onclick="finishRound()" ${isReveal?'':'disabled'}>➡ 이 문제 마감 · 다음 문제로</button>
       <button class="btn btn-gold" onclick="tryFinalizeTie()">🏆 지금 결선 확정</button>
+      <button class="btn btn-red" onclick="resetTieBreak()">🔄 리셋</button>
       <button class="btn btn-gray" onclick="cancelTieBreak()">취소</button>
     </div>
     ${isReveal? '' : '<div style="font-size:0.76rem;color:#94a3b8;margin-top:6px;">⏳ 30초 타이머가 끝나야 다음 문제로 넘어갈 수 있어요 (오답 처리는 지금도 가능해요)</div>'}
@@ -673,9 +744,22 @@ function cancelTieBreak(){
   document.getElementById('tiebreak-area').classList.add('hidden');
 }
 
+// ── 리셋: 지금 그룹을 처음부터(1번 문제부터) 다시 시작. 진행 중 언제든 사용 가능 ──
+async function resetTieBreak(){
+  if(!confirm('정말 이 그룹의 동점자 결선을 처음부터 다시 시작할까요?\n지금까지의 진행 상황(오답 처리, 라운드 기록)이 모두 초기화돼요.\n(이미 사용한 보너스 문제는 재사용하지 않고, 다음 새 문제부터 다시 시작해요.)')) return;
+  clearTbTimers();
+  if(tbSubmissionsUnsub){ tbSubmissionsUnsub(); tbSubmissionsUnsub=null; }
+  if(tbPresenceUnsub){ tbPresenceUnsub(); tbPresenceUnsub=null; }
+  // 이번 그룹에서 이미 사용한 문제들의 제출 기록도 함께 정리 (다음에 재사용하지 않도록 globalQPointer는 유지)
+  try{ await set(ref(db, `sessions/session_${sessionNum}/tiebreak/submissions`), null); }catch(e){}
+  startTieBreak();
+}
+
 window.tryLogin = tryLogin;
 window.loadResults = loadResults;
 window.startTieBreak = startTieBreak;
+window.resumeTieBreak = resumeTieBreak;
+window.resetTieBreak = resetTieBreak;
 window.beginRound = beginRound;
 window.toggleWrong = toggleWrong;
 window.checkAnswerHint = checkAnswerHint;

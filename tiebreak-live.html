@@ -130,7 +130,8 @@ function normalizeAnswer(s){ return (s||'').replace(/\s+/g,'').trim(); }
 let tbUnsub = null; // 현재 sessionNum에 대한 tiebreak 구독 해제 함수
 let presenceSent = false; // 이번 결선에 접속 알림을 이미 보냈는지 여부
 
-function safeKey(name){ return (name||'').replace(/[.#$\[\]\/]/g,'_'); }
+function safeKey(name){ return (name||'').normalize('NFC').trim().replace(/[.#$\[\]\/]/g,'_'); }
+function normName(s){ return (s||'').normalize('NFC').trim(); }
 
 function showScreen(id){
   ['login-view','waiting-view','quiz-view','elim-view','done-view'].forEach(v=>{
@@ -161,7 +162,7 @@ async function init(){
 init();
 
 function tryJoin(){
-  const name = document.getElementById('name-input').value.trim();
+  const name = normName(document.getElementById('name-input').value);
   const errBox = document.getElementById('login-error');
   if(!name){
     errBox.textContent = '이름을 입력해주세요.';
@@ -206,13 +207,17 @@ function resubscribeTiebreak(){
     lastState.everActive = true;
 
     const groupNames = data.groupNames || [];
-    if(!groupNames.includes(myName)){
+    // 기기/입력방식에 따라 유니코드 정규화가 다를 수 있어 정규화 후 비교하고,
+    // 일치하면 진행자 쪽 명단에 있는 '정식 표기'로 내 이름을 맞춰서 이후 매칭이 항상 정확히 되도록 함
+    const matched = groupNames.find(n => normName(n) === myName);
+    if(!matched){
       document.getElementById('login-error').textContent = '⚠️ 동점자 결선 대상자 명단에서 이름을 찾을 수 없어요. 이름을 다시 확인해주세요.';
       document.getElementById('login-error').classList.add('show');
       joined = false;
       showScreen('login-view');
       return;
     }
+    myName = matched;
 
     // 명단 확인이 끝났으면 진행자에게 접속 사실을 즉시 알림 (문제가 시작되기 전이어도 상관없음)
     sendPresence();
@@ -226,7 +231,7 @@ function resubscribeTiebreak(){
     }
 
     const activeNames = data.activeNames || [];
-    if(!activeNames.includes(myName)){
+    if(!activeNames.some(n => normName(n) === normName(myName))){
       eliminated = true;
       if(tickInterval){ clearInterval(tickInterval); tickInterval=null; }
       showScreen('elim-view');
