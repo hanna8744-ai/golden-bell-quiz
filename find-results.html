@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>골든벨 데이터 찾기 (전체 회차 스캔)</title>
+<style>
+  :root{--navy:#1a2744;--blue:#2563eb;--green:#16a34a;--red:#dc2626;--gray:#64748b;--teal:#0f766e;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#1a2744 0%,#0f766e 100%);min-height:100vh;color:#222;padding:20px;}
+  .wrap{max-width:900px;margin:0 auto;}
+  .card{background:rgba(255,255,255,0.98);border-radius:20px;padding:28px 26px;box-shadow:0 20px 60px rgba(0,0,0,0.3);margin-bottom:16px;}
+  .center-card{max-width:460px;margin:8vh auto;text-align:center;}
+  h1{font-size:1.4rem;font-weight:900;color:var(--navy);margin-bottom:8px;}
+  .sub{color:var(--gray);font-size:0.85rem;margin-bottom:16px;}
+  .name-input{width:100%;padding:12px 15px;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;outline:none;margin-bottom:10px;text-align:center;}
+  .btn{padding:12px 20px;border:none;border-radius:12px;font-size:0.95rem;font-weight:800;cursor:pointer;color:white;background:var(--teal);}
+  .btn:hover{opacity:0.9;}
+  .hidden{display:none !important;}
+  table{width:100%;border-collapse:collapse;font-size:0.85rem;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #eee;}
+  th{color:var(--gray);font-size:0.75rem;text-transform:uppercase;background:#f8fafc;}
+  tr.has-data{background:#f0fdf4;}
+  tr.has-data td:first-child{font-weight:800;color:var(--green);}
+  .badge{display:inline-block;background:#e0f2fe;color:#0369a1;border-radius:20px;padding:4px 14px;font-size:0.78rem;font-weight:700;margin-bottom:14px;}
+  .progress{font-size:0.8rem;color:var(--gray);margin-bottom:10px;}
+  .top-info{font-size:0.78rem;color:#166534;margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="card center-card" id="login-view">
+  <h1>🔍 골든벨 데이터 찾기</h1>
+  <p class="sub">전체 회차(1~50회차)를 한 번에 스캔해서, 실제로 결과가 저장된 회차를 찾아드려요.</p>
+  <input type="password" id="pw-input" class="name-input" placeholder="비밀번호 입력">
+  <button class="btn" onclick="tryLogin()">🔍 스캔 시작</button>
+</div>
+
+<div class="hidden" id="main-view">
+  <div class="card">
+    <h1>🔍 전체 회차 스캔 결과</h1>
+    <div class="badge" id="global-meta-info">global_meta 확인 중...</div>
+    <div class="progress" id="progress-text">스캔 준비 중...</div>
+    <table>
+      <thead><tr><th>회차</th><th>참여자수(meta)</th><th>리더보드 기록 수</th><th>최고점수자</th></tr></thead>
+      <tbody id="result-body"></tbody>
+    </table>
+  </div>
+</div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBT8yXBaLulPjQGgv_wiDyRhcM4LC1CgE8",
+  authDomain: "golden-bell-quiz.firebaseapp.com",
+  databaseURL: "https://golden-bell-quiz-default-rtdb.firebaseio.com",
+  projectId: "golden-bell-quiz",
+  storageBucket: "golden-bell-quiz.firebasestorage.app",
+  messagingSenderId: "544242063266",
+  appId: "1:544242063266:web:bbb221a1660f088d1ac4fb"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const ADMIN_PASSWORD = 'welcome';
+const MAX_SCAN = 50; // 1회차부터 50회차까지 스캔 (30회차 넘게 진행됐을 가능성 대비 넉넉하게)
+
+function tryLogin(){
+  const pw = document.getElementById('pw-input').value;
+  if(pw !== ADMIN_PASSWORD){
+    alert('❌ 비밀번호가 올바르지 않습니다.');
+    return;
+  }
+  document.getElementById('login-view').classList.add('hidden');
+  document.getElementById('main-view').classList.remove('hidden');
+  runScan();
+}
+
+async function runScan(){
+  const progressEl = document.getElementById('progress-text');
+  const bodyEl = document.getElementById('result-body');
+  const metaInfoEl = document.getElementById('global-meta-info');
+
+  try{
+    const gmSnap = await get(ref(db, 'global_meta'));
+    if(gmSnap.exists()){
+      const gm = gmSnap.val();
+      metaInfoEl.textContent = `global_meta.sessionNum = ${gm.sessionNum} (현재 시스템이 "현재 회차"라고 기억하는 값)`;
+    } else {
+      metaInfoEl.textContent = 'global_meta 데이터 없음';
+    }
+  }catch(e){
+    metaInfoEl.textContent = 'global_meta 조회 실패: ' + e.message;
+  }
+
+  let foundAny = false;
+
+  for(let n=1; n<=MAX_SCAN; n++){
+    progressEl.textContent = `스캔 중... ${n} / ${MAX_SCAN}회차`;
+    try{
+      const [metaSnap, lbSnap] = await Promise.all([
+        get(ref(db, `sessions/session_${n}/meta`)),
+        get(ref(db, `sessions/session_${n}/leaderboard`))
+      ]);
+      const meta = metaSnap.exists() ? metaSnap.val() : null;
+      const lb = lbSnap.exists() ? Object.values(lbSnap.val()).filter(v=>v && v.name) : [];
+
+      if(!meta && lb.length===0) continue; // 완전히 빈 회차는 표에 표시 안 함 (스캔 결과를 깔끔하게)
+
+      foundAny = true;
+      let top = null;
+      if(lb.length){
+        top = lb.slice().sort((a,b)=>{
+          if(b.score!==a.score) return b.score-a.score;
+          return (b.qReached||0)-(a.qReached||0);
+        })[0];
+      }
+      const row = document.createElement('tr');
+      row.className = 'has-data';
+      row.innerHTML = `
+        <td>${n}회차</td>
+        <td>${meta ? (meta.totalParticipants ?? '-') : '-'}</td>
+        <td>${lb.length}명</td>
+        <td>${top ? `${top.name} (${top.score}점)` : '-'}</td>
+      `;
+      bodyEl.appendChild(row);
+    }catch(e){
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${n}회차</td><td colspan="3" style="color:var(--red);">조회 오류: ${e.message}</td>`;
+      bodyEl.appendChild(row);
+    }
+  }
+
+  progressEl.textContent = foundAny
+    ? `✅ 스캔 완료 (1~${MAX_SCAN}회차 중 기록이 있는 회차만 위에 표시됨)`
+    : `⚠️ 스캔 완료 — 1~${MAX_SCAN}회차 전체에서 기록을 전혀 찾지 못했습니다. 아래 안내를 확인해주세요.`;
+
+  if(!foundAny){
+    bodyEl.innerHTML = `<tr><td colspan="4">
+      전체 회차에서 데이터를 찾지 못했습니다.<br><br>
+      가능한 원인:<br>
+      1) Firebase Realtime Database 보안 규칙이 만료되어 읽기가 차단됐을 수 있어요 (Firebase 콘솔 → Realtime Database → 규칙 확인)<br>
+      2) 서로 다른 Firebase 프로젝트/데이터베이스를 보고 있을 수 있어요<br>
+      3) 실제로는 아직 리더보드에 저장되기 전 단계(진행 중)였을 수 있어요
+    </td></tr>`;
+  }
+}
+
+window.tryLogin = tryLogin;
+document.getElementById('pw-input').addEventListener('keydown', (e)=>{ if(e.key==='Enter') tryLogin(); });
+</script>
+</body>
+</html>
